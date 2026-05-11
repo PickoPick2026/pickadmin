@@ -47,27 +47,27 @@ export default function Topbar({ onToggle }: TopbarProps) {
   }, [])
 
   // ✅ Online status effect (MOVED ABOVE RETURN)
-  useEffect(() => {
-    const checkOnlineStatus = async () => {
-      const session = localStorage.getItem("session")
-      if (!session) return
+  // useEffect(() => {
+  //   const checkOnlineStatus = async () => {
+  //     const session = localStorage.getItem("session")
+  //     if (!session) return
 
-      const parsed = JSON.parse(session)
+  //     const parsed = JSON.parse(session)
 
-      const { data } = await supabase
-        .from("userSessionTable")
-        .select("sessionStatus")
-        .eq("userID", parsed.userID)
-        .order("login_time", { ascending: false })
-        .limit(1)
+  //     const { data } = await supabase
+  //       .from("userSessionTable")
+  //       .select("sessionStatus")
+  //       .eq("userID", parsed.userID)
+  //       .order("login_time", { ascending: false })
+  //       .limit(1)
 
-      if (data && data.length > 0) {
-        setIsOnline(data[0].sessionStatus === "ONLINE")
-      }
-    }
+  //     if (data && data.length > 0) {
+  //       setIsOnline(data[0].sessionStatus === "ONLINE")
+  //     }
+  //   }
 
-    checkOnlineStatus()
-  }, [])
+  //   checkOnlineStatus()
+  // }, [])
 
   // ✅ Now safe
   if (!mounted) return null

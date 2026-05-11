@@ -66,6 +66,7 @@ export default function CustomerPage() {
         )
       `)
       .eq("customerStatus", true)
+      .order("created_at", { ascending: false })
 
     if (error) return console.error(error)
 

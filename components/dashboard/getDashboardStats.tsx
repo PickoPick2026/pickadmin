@@ -7,11 +7,13 @@ export const getDashboardStats = async () => {
   const { count: totalCustomers } = await supabase
     .from("customerList")
     .select("*", { count: "exact", head: true })
+    .eq("customerStatus", true)
 
   const { count: todayCustomers } = await supabase
     .from("customerList")
     .select("*", { count: "exact", head: true })
     .gte("created_at", today)
+    .eq("customerStatus", true)
 
   // Categories
   const { count: totalCategories } = await supabase
