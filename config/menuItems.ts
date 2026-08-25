@@ -23,6 +23,7 @@ import {
   LogOut,
   LayoutGrid,
   UserCircle,
+  ClipboardList,
 } from "lucide-react"
 
 
@@ -66,6 +67,12 @@ export const menuItems = [
     label: "Customer List",
     href: "/customer",
     icon: Users,
+  },
+  {
+    key: "nri",
+    label: "NRI Requests",
+    href: "/nri",
+    icon: ClipboardList,
   },
   
   
