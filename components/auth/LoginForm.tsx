@@ -1,324 +1,76 @@
 "use client"
 
 import Image from "next/image"
-import { Mail, Lock, User, EyeOff, Eye } from "lucide-react"
+import { Eye, EyeOff, Lock, Mail } from "lucide-react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import bcrypt from "bcryptjs"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
 import { CardContent } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { supabase } from "@/lib/supabase"
-import { toast } from 'sonner';
-import bcrypt from 'bcryptjs';
 
 export default function LoginForm() {
-    const router = useRouter()
-    const [email, setEmail] = useState("")
-    const [password, setPassword] = useState("")
-    const [showPassword, setShowPassword] = useState(false)
+  const router = useRouter()
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setIsSubmitting(true)
+    try {
+      const { data: adminLogin, error } = await supabase
+        .from("adminLoginTable")
+        .select("*")
+        .eq("username", username.trim())
+        .single()
 
-  const handleLogin = async (e: React.FormEvent) => {
-      e.preventDefault()
-
-      try {
-        // 1️⃣ Check Login Table
-        const { data: adminLoginTable, error: loginError } = await supabase
-          .from("adminLoginTable")
-          .select("*")
-          .eq("username", email)
-          .single()
-
-        if (loginError || !adminLoginTable) {
-          toast.error("Username or Password Invalid")
-          return
-        }
-
-        // 2️⃣ Compare Password
-        const isValid = await bcrypt.compare(password, adminLoginTable.password)
-
-        if (!isValid) {
-          toast.error("Incorrect password")
-          return
-        }
-
-        // 3️⃣ Get User Info
-        // const { data: user, error: userError } = await supabase
-        //   .from("adminLoginTable")
-        //   .select("userID, name, companyID")
-        //   .eq("userStatus", true)
-        //   .eq("userID", adminLoginTable.userID)
-        //   .single()
-
-        // if (userError || !user) {
-        //   toast.error("User record not found")
-        //   return
-        // }
-
-        
-
-        // 5️⃣ Create App Session Object
-        const session = {
-          id: adminLoginTable.adminLoginID,          
-          username: adminLoginTable.username,
-          role: adminLoginTable.role,
-          loggedIn: true,
-        }
-
-        // 6️⃣ Check If Already Online Session Exists
-        // const { data: existingSession } = await supabase
-        //   .from("userSessionTable")
-        //   .select("userSessionID")
-        //   .eq("userID", session.userID)
-        //   .eq("sessionStatus", "ONLINE")
-        //   .limit(1)
-
-        // let activeSessionID = null
-
-        // if (existingSession && existingSession.length > 0) {
-        //   // Update existing session
-        //   const { data: updatedSession } = await supabase
-        //     .from("userSessionTable")
-        //     .update({
-        //       login_time: new Date().toISOString(),
-        //     })
-        //     .eq("userSessionID", existingSession[0].userSessionID)
-        //     .select()
-        //     .single()
-
-        //   activeSessionID = updatedSession.userSessionID
-        // } else {
-        //   // Insert new session
-        //   const { data: newSession, error: sessionError } = await supabase
-        //     .from("userSessionTable")
-        //     .insert([
-        //       {
-        //         companyID: company.companyID,
-        //         userID: loginTable.userID,
-        //         login_time: new Date().toISOString(),
-        //         sessionStatus: "ONLINE",
-        //       },
-        //     ])
-        //     .select()
-        //     .single()
-
-        //   if (sessionError) {
-        //     toast.error("Failed to create user session")
-        //     return
-        //   }
-
-        //   activeSessionID = newSession.userSessionID
-        // }
-
-        // 7️⃣ Store Local Storage
-        localStorage.setItem("session", JSON.stringify(session))
-        //localStorage.setItem("activeSessionID", activeSessionID)
-
-        toast.success("Login successful")
-
-        // 8️⃣ Redirect
-        router.push("/dashboard")
-
-      } catch (err) {
-        console.error(err)
-        toast.error("Something went wrong")
+      if (error || !adminLogin || !(await bcrypt.compare(password, adminLogin.password))) {
+        toast.error("Username or password is invalid")
+        return
       }
+
+      localStorage.setItem("session", JSON.stringify({
+        id: adminLogin.adminLoginID,
+        username: adminLogin.username,
+        role: adminLogin.role,
+        loggedIn: true,
+      }))
+      toast.success("Login successful")
+      router.push("/dashboard")
+    } catch (error) {
+      console.error(error)
+      toast.error("Something went wrong. Please try again.")
+    } finally {
+      setIsSubmitting(false)
     }
+  }
+
   return (
-    <CardContent className="p-8">
-      {/* Logo + Heading */}
-      <div className="text-center mb-6">
-        <Image
-          src="/images/logo1.png"
-          alt="Logo"
-          width={300}
-          height={100}
-          className="mx-auto"
-        />
-        <h4 className="text-2xl font-bold mt-4">
-          Welcome to CRM 👋
-        </h4>
-        <p className="text-muted-foreground mt-2">
-          Access your account or create a new one
-        </p>
+    <CardContent className="p-6 sm:p-9">
+      <div className="mb-8 text-center">
+        <Image src="https://pickopick.com/PICKLogo.png" alt="Pick O Pick" width={150} height={58} className="mx-auto h-auto w-[130px] sm:w-[150px]" priority />
+        <h1 className="mt-6 text-2xl font-extrabold tracking-tight text-slate-900">Welcome back</h1>
+        <p className="mt-2 text-sm text-slate-500">Sign in to manage Pick O Pick operations.</p>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="login" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
-          <div />
-          <TabsTrigger value="login" className="px-10 mx-auto">
-            Login
-          </TabsTrigger>
-          <div />
-        </TabsList>
-        {/* <TabsList className="flex justify-center mb-6">
-          {/* <TabsTrigger value="login" >Login</TabsTrigger> */}
-          {/* <TabsTrigger value="register" >Register</TabsTrigger>
-          <TabsTrigger value="forgot" >Forgot</TabsTrigger> */}
-        {/* </TabsList>  */}
-
-        {/* ================= LOGIN ================= */}
-        <TabsContent value="login">
-          <form className="space-y-4" onSubmit={handleLogin}>
-            <div className="space-y-2">
-              <Label>UserName</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="text"
-                  name="email"
-                  placeholder="username"
-                  className="pl-10"
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  placeholder="••••••••"
-                  className="pl-10 pr-10"
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-
-                {/* Eye Icon */}
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-3 text-muted-foreground"
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Checkbox id="remember" />
-                <Label htmlFor="remember">Keep me signed in</Label>
-              </div>
-
-              {/* <button
-                type="button"
-                className="text-sm font-medium text-primary hover:underline"
-                onClick={() => {
-                  // switch to forgot tab
-                  document
-                    .querySelector('[data-value="forgot"]')
-                    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-                }}
-              >
-                Forgot password?
-              </button> */}
-            </div>
-
-            <Button className="w-full" type="submit">Sign In</Button>
-          </form>
-        </TabsContent>
-
-        {/* ================= REGISTER ================= */}
-        <TabsContent value="register">
-          <form className="space-y-4">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Name"
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="email"
-                  placeholder="email@gmail.com"
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  placeholder="••••••••"
-                  className="pl-10"
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Use 8+ characters with letters, numbers & symbols.
-              </p>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox id="terms" />
-              <Label htmlFor="terms">Agree the Terms & Policy</Label>
-            </div>
-
-            <Button className="w-full" type="button">Create Account</Button>
-          </form>
-        </TabsContent>
-
-        {/* ================= FORGOT PASSWORD ================= */}
-        <TabsContent value="forgot">
-          <form className="space-y-4">
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="email"
-                  placeholder="you@example.com"
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox id="policy" />
-              <Label htmlFor="policy">Agree the Terms & Policy</Label>
-            </div>
-
-            <Button className="w-full" type="button">Send Reset Link</Button>
-          </form>
-        </TabsContent>
-      </Tabs>
-
-      {/* Footer */}
-      <p className="text-center text-xs text-muted-foreground mt-8">
-        © {new Date().getFullYear()} CRM — {" "}
-        <a
-            href="https://altixbusinesssolutions.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold hover:underline"
-          >
-            Altix Business Solutions
-          </a>
-      </p>
+      <form className="space-y-5" onSubmit={handleLogin}>
+        <div className="space-y-2">
+          <Label htmlFor="username">Username</Label>
+          <div className="relative"><Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><Input id="username" required autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Enter your username" className="h-11 border-slate-200 pl-10" /></div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <div className="relative"><Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><Input id="password" required autoComplete="current-password" type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" className="h-11 border-slate-200 pl-10 pr-10" /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((current) => !current)} className="absolute right-3 top-3 text-slate-400 hover:text-slate-700">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-600"><Checkbox id="remember" /><span>Keep me signed in</span></label>
+        <Button className="h-11 w-full bg-[#0B56D9] font-bold text-white hover:bg-[#0849B7]" disabled={isSubmitting} type="submit">{isSubmitting ? "Signing in…" : "Sign in"}</Button>
+      </form>
     </CardContent>
   )
 }
