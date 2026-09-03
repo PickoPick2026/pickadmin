@@ -6,6 +6,9 @@ import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import CategoryList from "./CategoryList"
 import CategoryForm from "./CategoryForm"
+import PageHeader from "@/components/common/PageHeader"
+import { ArrowLeft } from "lucide-react"
+import Link from "next/link"
 
 
 export type Category = {
@@ -83,21 +86,23 @@ export default function CategoryPage() {
 
   return (
     <div className="space-y-6">
-      
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Category List</h1>
-        <input
-          placeholder="Search category..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="border px-3 py-2 rounded w-64"
-        />
+      <Link
+        href="/product"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800"
+      >
+        <ArrowLeft size={15} /> Back to Products
+      </Link>
 
-        <Button onClick={() => setOpen(true)}>
-          Add Category
-        </Button>
-      </div>
+      <PageHeader
+        title="Manage Categories"
+        subtitle={`${categories.filter((c) => c.categoryStatus).length} active categories`}
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: "Search category…",
+        }}
+        actions={<Button onClick={() => setOpen(true)}>Add Category</Button>}
+      />
 
       <CategoryList
         categories={filtered}

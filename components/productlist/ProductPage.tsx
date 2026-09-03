@@ -4,7 +4,10 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { LayoutGrid } from "lucide-react"
 import ProductList from "./ProductList"
+import PageHeader from "@/components/common/PageHeader"
 
 export type Product = {
   productID: number
@@ -67,20 +70,25 @@ const handleEdit = (product: Product) => {
   return (
     <div className="space-y-6">
 
-      {/* Top */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Product List</h1>
-        <input
-          placeholder="Search product..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="border px-3 py-2 rounded w-64"
-        />
-
-        <Button onClick={() => router.push("/product/add")}>
-          + Add Product
-        </Button>
-      </div>
+      <PageHeader
+        title="Product List"
+        subtitle={`${products.length} product${products.length === 1 ? "" : "s"}`}
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: "Search product…",
+        }}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/category">
+                <LayoutGrid size={16} /> Manage Categories
+              </Link>
+            </Button>
+            <Button onClick={() => router.push("/product/add")}>+ Add Product</Button>
+          </div>
+        }
+      />
 
       <ProductList
   products={filtered}

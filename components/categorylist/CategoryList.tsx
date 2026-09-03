@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Pencil, Trash2 } from "lucide-react"
+import { GripVertical, Pencil, Trash2 } from "lucide-react"
 import { Category } from "./CategoryPage"
 import TablePagination from "@/components/common/TablePagination"
 import { ITEMS_PER_PAGE } from "@/lib/tableperpage"
+import { EmptyRow, IconButton, StatusPill, TableCard, Thead, Tr } from "@/components/common/table"
 
 export default function CategoryList({
   categories,
@@ -18,80 +19,68 @@ export default function CategoryList({
   const [page, setPage] = useState(1)
 
   const totalPages = Math.ceil(categories.length / ITEMS_PER_PAGE)
-
-  const data = categories.slice(
-    (page - 1) * ITEMS_PER_PAGE,
-    page * ITEMS_PER_PAGE
-  )
+  const data = categories.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
 
   useEffect(() => setPage(1), [categories])
 
-  if (categories.length === 0) {
-    return <p className="text-sm text-gray-500">No categories found</p>
-  }
-
   return (
     <>
-      <div className="border rounded-xl overflow-hidden bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="p-3 text-left">Name</th>
-              <th className="p-3">Sequence</th>
-              <th className="p-3">Status</th>
-              <th className="p-3 text-right">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {data.map((c) => (
-              <tr key={c.categoryID} className="border-t">
-                <td className="p-3 font-medium">
-                  {c.categoryName}
+      <TableCard minWidth={560}>
+        <Thead>
+          <tr>
+            <th className="w-16 p-3 text-center">Seq</th>
+            <th className="p-3">Category</th>
+            <th className="p-3">Status</th>
+            <th className="p-3 text-right">Actions</th>
+          </tr>
+        </Thead>
+        <tbody>
+          {data.length === 0 ? (
+            <EmptyRow colSpan={4}>No categories found</EmptyRow>
+          ) : (
+            data.map((c) => (
+              <Tr key={c.categoryID}>
+                <td className="p-3">
+                  <span className="mx-auto flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-xs font-semibold text-slate-500">
+                    {c.categorySequence}
+                  </span>
                 </td>
-
-                <td className="p-3 text-center">
-                  {c.categorySequence}
+                <td className="p-3">
+                  <div className="flex items-center gap-2">
+                    <GripVertical size={14} className="text-slate-300" />
+                    <span className="font-medium text-slate-800">{c.categoryName}</span>
+                  </div>
                 </td>
-
-                <td className="p-3 text-center">
-                  {c.categoryStatus ? (
-                    <span className="text-green-600">Active</span>
-                  ) : (
-                    <span className="text-red-600">Inactive</span>
-                  )}
+                <td className="p-3">
+                  <StatusPill active={c.categoryStatus}>
+                    {c.categoryStatus ? "Active" : "Inactive"}
+                  </StatusPill>
                 </td>
-
-                <td className="p-3 text-right">
-                  {c.categoryStatus && (
-                    <>
-                      <button
-                        onClick={() => onEdit(c)}
-                        className="p-1 hover:text-blue-600"
-                      >
-                        <Pencil size={16} />
-                      </button>
-
-                      <button
-                        onClick={() => onDelete(c.categoryID)}
-                        className="p-1 ml-2 hover:text-red-600"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </>
-                  )}
+                <td className="p-3">
+                  <div className="flex items-center justify-end gap-1">
+                    {c.categoryStatus && (
+                      <>
+                        <IconButton onClick={() => onEdit(c)} title="Edit category" tone="blue">
+                          <Pencil size={15} />
+                        </IconButton>
+                        <IconButton
+                          onClick={() => onDelete(c.categoryID)}
+                          title="Deactivate category"
+                          tone="red"
+                        >
+                          <Trash2 size={15} />
+                        </IconButton>
+                      </>
+                    )}
+                  </div>
                 </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+              </Tr>
+            ))
+          )}
+        </tbody>
+      </TableCard>
 
-      <TablePagination
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-      />
+      <TablePagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
     </>
   )
 }

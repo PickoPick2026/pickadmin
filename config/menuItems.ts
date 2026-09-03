@@ -24,6 +24,7 @@ import {
   LayoutGrid,
   UserCircle,
   ClipboardList,
+  Calculator,
 } from "lucide-react"
 
 
@@ -73,6 +74,12 @@ export const menuItems = [
     label: "NRI Requests",
     href: "/nri",
     icon: ClipboardList,
+  },
+  {
+    key: "estimates",
+    label: "Estimate Leads",
+    href: "/estimates",
+    icon: Calculator,
   },
   
   

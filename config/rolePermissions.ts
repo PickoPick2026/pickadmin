@@ -8,6 +8,7 @@ export const rolePermissions: Record<Role, string[]> = {
     "users",
     "customer",
     "nri",
+    "estimates",
     "category",
     "logout",
   ],
@@ -34,6 +35,7 @@ export const rolePermissions: Record<Role, string[]> = {
     "outcomes",
     "admin_settings",
     "nri",
+    "estimates",
     "logout",
   ],
 

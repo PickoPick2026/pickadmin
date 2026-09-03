@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import CustomerList from "./CustomerList"
 import CustomerForm from "./CustomerForm"
+import PageHeader from "@/components/common/PageHeader"
 import bcrypt from "bcryptjs"
 
 export type Address = {
@@ -240,16 +241,16 @@ export default function CustomerPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between">
-        <h1 className="text-2xl font-bold">Customer List</h1>
-        <input
-            placeholder="Search customer..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="border px-3 py-2 rounded w-64"
-        />
-        <Button onClick={() => setOpen(true)}>Add Customer</Button>
-      </div>
+      <PageHeader
+        title="Customer List"
+        subtitle={`${customers.length} active customer${customers.length === 1 ? "" : "s"}`}
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: "Search name, phone or email…",
+        }}
+        actions={<Button onClick={() => setOpen(true)}>Add Customer</Button>}
+      />
 
       <CustomerList
         customers={filteredCustomers}

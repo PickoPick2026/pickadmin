@@ -5,9 +5,9 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import UserForm from "./UserForm"
 import UsersList from "./UsersList"
+import PageHeader from "@/components/common/PageHeader"
 import { supabase } from "@/lib/supabase"
 import bcrypt from "bcryptjs"
-import { Input } from "../ui/input"
 
 export type User = {
   adminLoginID: number
@@ -104,18 +104,18 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between">
-        <h1 className="text-2xl font-bold">Users</h1>
-        <Input
-          placeholder="Search username or role..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
-        <Button onClick={() => setOpen(true)}>Add User</Button>
-      </div>
+      <PageHeader
+        title="Admin Users"
+        subtitle={`${users.length} account${users.length === 1 ? "" : "s"}`}
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: "Search username or role…",
+        }}
+        actions={<Button onClick={() => setOpen(true)}>Add User</Button>}
+      />
 
-      
+
 
       {open && (
         <UserForm

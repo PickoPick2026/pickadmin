@@ -7,6 +7,7 @@ import { useState } from "react"
 import { supabase } from "@/lib/supabase"
 import TablePagination from "@/components/common/TablePagination"
 import { ITEMS_PER_PAGE } from "@/lib/tableperpage"
+import { EmptyRow, StatusPill, TableCard, Thead, Tr } from "@/components/common/table"
 
 export default function ProductList({
   products,
@@ -58,22 +59,22 @@ const saveEdit = async (id: number) => {
 const router = useRouter()
   return (
     <>
-    <div className="border rounded-xl overflow-hidden bg-white">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-100">
+    <TableCard minWidth={900}>
+        <Thead>
           <tr>
-            <th className="p-3 text-left">Product</th>
-            <th className="p-3 text-left">Category</th>
-            <th className="p-3 text-left">SKU</th>
-            <th className="p-3 text-left">Stock</th>
-            <th className="p-3 text-left">Price</th>
-            <th className="p-3 text-left">Images</th>
-            <th className="p-3 ">Status</th>
+            <th className="p-3">Product</th>
+            <th className="p-3">Category</th>
+            <th className="p-3">SKU</th>
+            <th className="p-3">Stock</th>
+            <th className="p-3">Price</th>
+            <th className="p-3">Images</th>
+            <th className="p-3">Status</th>
             <th className="p-3 text-right">Actions</th>
           </tr>
-        </thead>
+        </Thead>
 
         <tbody>
+          {data.length === 0 && <EmptyRow colSpan={8}>No products found</EmptyRow>}
           {data.map((p) => {
             const images =
               typeof p.imageURL === "string"
@@ -81,12 +82,12 @@ const router = useRouter()
                 : p.imageURL ?? []
 
             return (
-              <tr key={p.productID} className="border-t">
-                <td className="p-3 font-medium">
+              <Tr key={p.productID}>
+                <td className="p-3 font-medium text-slate-800">
                   {p.productName}
                 </td>
 
-                <td className="p-3">
+                <td className="p-3 text-slate-600">
                   {p.category?.categoryName || "—"}
                 </td>
 
@@ -132,15 +133,7 @@ const router = useRouter()
                 </td>
 
                 <td className="p-3 text-center">
-                  <span
-                    className={
-                      p.status === "Closed"
-                        ? "text-red-500"
-                        : "text-green-600"
-                    }
-                  >
-                    {p.status}
-                  </span>
+                  <StatusPill active={p.status !== "Closed"}>{p.status}</StatusPill>
                 </td>
 
                 {/* ACTIONS */}
@@ -188,13 +181,12 @@ const router = useRouter()
                     <Trash2 size={16} />
                   </button>
                 </td>
-              </tr>
+              </Tr>
             )
           })}
         </tbody>
-      </table>
-    </div>
-    
+    </TableCard>
+
     <TablePagination
             currentPage={page}
             totalPages={totalPages}
