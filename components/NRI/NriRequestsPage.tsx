@@ -31,7 +31,7 @@ function Field({ label, value }: { label: string; value: unknown }) {
 function RequestDetails({ request }: { request: NriRequest }) {
   const data = request.payload || {}
   if (request.request_type === "consultation") return <div className="mt-5 space-y-3">
-    <DetailSection title="Consultation request"><Field label="Customer" value={data.fullName || request.customer_name} /><Field label="WhatsApp" value={data.whatsappNumber || request.whatsapp_number} /><Field label="Current country" value={data.currentCountry || request.country} /><Field label="Email" value={data.email || request.email} /><Field label="Preferred date" value={data.preferredDate || request.preferred_date || "Flexible"} /><Field label="Preferred time" value={data.preferredTime || request.preferred_time || "Flexible"} /></DetailSection>
+    <DetailSection title="Consultation request"><Field label="Customer" value={data.fullName || request.customer_name} /><Field label="Mobile number" value={data.mobileNumber} /><Field label="WhatsApp" value={data.whatsappNumber || request.whatsapp_number} /><Field label="Current country" value={data.currentCountry || request.country} /><Field label="Email" value={data.email || request.email} /><Field label="Preferred date" value={data.preferredDate || request.preferred_date || "Flexible"} /><Field label="Preferred time" value={data.preferredTime || request.preferred_time || "Flexible"} /><Field label="Customer timezone" value={data.timezone} /></DetailSection>
     <DetailSection title="What the customer needs"><Field label="Requirement" value={data.requirementHelp || "General consultation"} /></DetailSection>
   </div>
 
