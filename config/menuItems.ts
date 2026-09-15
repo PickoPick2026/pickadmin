@@ -25,9 +25,8 @@ import {
   UserCircle,
   ClipboardList,
   Calculator,
-} from "lucide-react"
-
-
+  ShoppingBag,
+} from "lucide-react";
 
 export const menuItems = [
   {
@@ -35,11 +34,7 @@ export const menuItems = [
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-      
   },
-  
-  
-  
   {
     key: "users",
     label: "Admin Users",
@@ -57,17 +52,18 @@ export const menuItems = [
     label: "Product",
     href: "/product",
     icon: Layers,
-    // children: [
-    //   { key: "dash1", label: "Category", href: "/category" },
-    //    { key: "dash2", label: "Analytics", href: "/dashboard" },
-    //   { key: "dash3", label: "CRM", href: "/dashboard/crm" },
-    // ],
   },
   {
     key: "customer",
     label: "Customer List",
     href: "/customer",
     icon: Users,
+  },
+  {
+    key: "quotes",
+    label: "Quote Requests",
+    href: "/quotes",
+    icon: ShoppingBag,
   },
   {
     key: "nri",
@@ -81,34 +77,6 @@ export const menuItems = [
     href: "/estimates",
     icon: Calculator,
   },
-  
-  
-  // {
-  //   key: "segment",
-  //   label: "Segment",
-  //   href: "/segment",
-  //   icon: Layers,
-  // },
-  
-  
-  // {
-  //   key: "lead_source",
-  //   label: "Lead Source",
-  //   href: "/leadsource",
-  //   icon: Database,
-  // },
-  // {
-  //   key: "lead_status",
-  //   label: "Lead Stage",
-  //   href: "/leadstatus",
-  //   icon: Tag,
-  // },
-  // {
-  //   key: "lead_dispositor",
-  //   label: "Lead Disposition",
-  //   href: "/disposition",
-  //   icon: ToolCase,
-  // },
   {
     key: "upload_leads",
     label: "Import Leads",
@@ -133,12 +101,6 @@ export const menuItems = [
     href: "#",
     icon: Megaphone,
   },
-  // {
-  //   key: "break_setting",
-  //   label: "Break Setting",
-  //   href: "/breaksetting",
-  //   icon: Coffee,
-  // },
   {
     key: "chat",
     label: "Chat",
@@ -193,11 +155,10 @@ export const menuItems = [
     href: "/setting",
     icon: Settings,
   },
-  
   {
     key: "logout",
     label: "Logout",
     href: "/",
     icon: LogOut,
   },
-]
+];

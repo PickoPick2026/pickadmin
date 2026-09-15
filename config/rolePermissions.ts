@@ -1,4 +1,4 @@
-export type Role = "SUPER_ADMIN" | "ADMIN" | "INSIDESALE" | "SUPERVISOR"
+export type Role = "SUPER_ADMIN" | "ADMIN" | "INSIDESALE" | "SUPERVISOR";
 
 export const rolePermissions: Record<Role, string[]> = {
   SUPER_ADMIN: [
@@ -7,6 +7,7 @@ export const rolePermissions: Record<Role, string[]> = {
     "company_restriction",
     "users",
     "customer",
+    "quotes",
     "nri",
     "estimates",
     "category",
@@ -16,11 +17,7 @@ export const rolePermissions: Record<Role, string[]> = {
   ADMIN: [
     "dashboard",
     "users",
-    //"segment",
-    //"break_setting",    
-    //"lead_source",
-   // "lead_status",
-    //"lead_dispositor",
+    "quotes",
     "upload_leads",
     "leads",
     "call_setting",
@@ -39,21 +36,7 @@ export const rolePermissions: Record<Role, string[]> = {
     "logout",
   ],
 
-  INSIDESALE: [
-    "dashboard",
-    "leads",
-    "logout",
-  ],
+  INSIDESALE: ["dashboard", "leads", "logout"],
 
-  SUPERVISOR: [
-    "dashboard",
-    "upload_leads",
-    "leads",
-    "breakreport",
-    "logout",
-  ],
-}
-
-
-
-
+  SUPERVISOR: ["dashboard", "upload_leads", "leads", "breakreport", "logout"],
+};
