@@ -7,6 +7,7 @@ export const rolePermissions: Record<Role, string[]> = {
     "company_restriction",
     "users",
     "customer",
+    "services",
     "quotes",
     "nri",
     "estimates",
@@ -17,6 +18,7 @@ export const rolePermissions: Record<Role, string[]> = {
   ADMIN: [
     "dashboard",
     "users",
+    "services",
     "quotes",
     "upload_leads",
     "leads",

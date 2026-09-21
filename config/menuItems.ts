@@ -26,6 +26,7 @@ import {
   ClipboardList,
   Calculator,
   ShoppingBag,
+  PackageCheck,
 } from "lucide-react";
 
 export const menuItems = [
@@ -58,6 +59,12 @@ export const menuItems = [
     label: "Customer List",
     href: "/customer",
     icon: Users,
+  },
+  {
+    key: "services",
+    label: "Service Requests",
+    href: "/services",
+    icon: PackageCheck,
   },
   {
     key: "quotes",
