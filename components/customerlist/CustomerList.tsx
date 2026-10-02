@@ -60,7 +60,7 @@ export default function CustomerList({
                 <Tr key={c.customerID}>
                   <td className="p-3">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
                         {initials(c.firstName, c.lastName)}
                       </span>
                       <div>
@@ -106,7 +106,7 @@ export default function CustomerList({
                                 key={i}
                                 className={`flex items-start justify-between gap-2 rounded-md border p-2 text-xs ${
                                   a.isDefault
-                                    ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                                    ? "border-blue-300 bg-blue-50 text-blue-700"
                                     : "border-slate-200 bg-slate-50 text-slate-600"
                                 }`}
                               >
@@ -114,7 +114,7 @@ export default function CustomerList({
                                   <span className="font-semibold">{a.addressType}</span>: {a.addressDetails}
                                 </span>
                                 {a.isDefault && (
-                                  <span className="rounded bg-indigo-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                                  <span className="rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
                                     Default
                                   </span>
                                 )}

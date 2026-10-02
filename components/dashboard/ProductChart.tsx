@@ -18,11 +18,11 @@ type Props = {
   categoryBreakdown: { name: string; products: number }[]
 }
 
-const BAR_COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6", "#ec4899"]
+const BAR_COLORS = ["#0B56D9", "#2F6FEA", "#5F97F6", "#96BAFA", "#C2D7FC", "#0A48B5", "#DCE8FD"]
 
 function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border bg-white p-5 shadow-sm">
+    <div className="rounded-xl border bg-white p-5">
       <div className="mb-4">
         <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
         {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
@@ -36,7 +36,6 @@ const tooltipStyle = {
   borderRadius: 10,
   border: "1px solid #e2e8f0",
   fontSize: 12,
-  boxShadow: "0 4px 16px rgb(15 23 42 / 0.08)",
 }
 
 export default function ProductChart({ signupTrend, categoryBreakdown }: Props) {
@@ -49,8 +48,8 @@ export default function ProductChart({ signupTrend, categoryBreakdown }: Props) 
           <AreaChart data={signupTrend} margin={{ top: 5, right: 8, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="signupFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#6366f1" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                <stop offset="0%" stopColor="#0B56D9" stopOpacity={0.35} />
+                <stop offset="100%" stopColor="#0B56D9" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -60,7 +59,7 @@ export default function ProductChart({ signupTrend, categoryBreakdown }: Props) 
             <Area
               type="monotone"
               dataKey="customers"
-              stroke="#6366f1"
+              stroke="#0B56D9"
               strokeWidth={2}
               fill="url(#signupFill)"
             />

@@ -49,9 +49,9 @@ type ModuleConfig = {
 
 const dotClasses: Record<string, string> = {
   rose: "bg-rose-500",
-  amber: "bg-amber-500",
+  amber: "bg-blue-400",
   blue: "bg-blue-500",
-  indigo: "bg-indigo-500",
+  indigo: "bg-blue-500",
   emerald: "bg-emerald-500",
   slate: "bg-slate-400",
 }
@@ -188,12 +188,12 @@ const MODULES: ModuleConfig[] = [
 function KanbanCard({ card, ownerName, dragging }: { card: Card; ownerName: string | null; dragging?: boolean }) {
   return (
     <div
-      className={`rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition ${
-        dragging ? "rotate-2 shadow-lg ring-2 ring-indigo-300" : "hover:border-indigo-200 hover:shadow-md"
+      className={`rounded-xl border border-slate-200 bg-white p-3 transition ${
+        dragging ? "rotate-2 ring-2 ring-blue-300" : "hover:border-blue-200"
       }`}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="font-mono text-[11px] font-bold text-orange-600">{card.code}</span>
+        <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 font-mono text-[11px] font-bold text-blue-700">{card.code}</span>
         <GripVertical size={14} className="shrink-0 text-slate-300" />
       </div>
       <p className="mt-1 truncate text-sm font-semibold text-slate-800" title={card.name}>
@@ -211,12 +211,12 @@ function KanbanCard({ card, ownerName, dragging }: { card: Card; ownerName: stri
           {ownerName ? (
             <span
               title={`Owner: ${ownerName}`}
-              className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-1.5 py-0.5 ring-1 ring-indigo-200"
+              className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 ring-1 ring-blue-200"
             >
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[8px] font-bold uppercase text-white">
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[8px] font-bold uppercase text-white">
                 {ownerName[0]}
               </span>
-              <span className="max-w-[70px] truncate text-[10px] font-semibold text-indigo-700">{ownerName}</span>
+              <span className="max-w-[70px] truncate text-[10px] font-semibold text-blue-700">{ownerName}</span>
             </span>
           ) : (
             <span className="rounded-full border border-dashed border-slate-300 px-1.5 py-0.5 text-[9px] font-semibold text-slate-400">
@@ -279,7 +279,7 @@ function Column({
       <div
         ref={setNodeRef}
         className="flex-1 space-y-2 overflow-y-auto rounded-xl border border-dashed bg-slate-50/60 p-2 transition-colors min-h-[120px]"
-        style={isOver ? { borderColor: "#818cf8", backgroundColor: "rgb(238 242 255 / 0.7)" } : undefined}
+        style={isOver ? { borderColor: "#0B56D9", backgroundColor: "rgb(238 244 254 / 0.7)" } : undefined}
       >
         {cards.map((card) => (
           <DraggableCard
@@ -522,7 +522,7 @@ export default function KanbanBoard() {
               onClick={() => setModuleKey(m.key)}
               className={`inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition ${
                 moduleKey === m.key
-                  ? "bg-slate-900 text-white shadow"
+                  ? "bg-slate-900 text-white"
                   : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
               }`}
             >
@@ -536,7 +536,7 @@ export default function KanbanBoard() {
       {/* Board */}
       {loading ? (
         <div className="flex h-64 items-center justify-center rounded-xl border bg-white text-sm text-slate-500">
-          <RefreshCw size={18} className="mr-2 animate-spin text-indigo-600" /> Loading board…
+          <RefreshCw size={18} className="mr-2 animate-spin text-blue-600" /> Loading board…
         </div>
       ) : (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>

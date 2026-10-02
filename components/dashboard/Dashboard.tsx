@@ -30,8 +30,8 @@ function MiniStat({
   href?: string
 }) {
   const body = (
-    <div className="flex items-center gap-3 rounded-xl border bg-white p-3 shadow-sm transition-colors hover:border-slate-300">
-      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+    <div className="flex items-center gap-3 rounded-xl border bg-white p-3 transition-colors hover:border-blue-200">
+      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
         <Icon size={17} />
       </span>
       <div>
@@ -96,7 +96,7 @@ export default function Dashboard() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-800">Recent customers</h2>
-            <Link href="/customer" className="text-xs font-medium text-indigo-600 hover:underline">
+            <Link href="/customer" className="text-xs font-medium text-blue-600 hover:underline">
               View all
             </Link>
           </div>
@@ -131,7 +131,7 @@ export default function Dashboard() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-800">Low / out of stock</h2>
-            <Link href="/product" className="text-xs font-medium text-indigo-600 hover:underline">
+            <Link href="/product" className="text-xs font-medium text-blue-600 hover:underline">
               Manage products
             </Link>
           </div>

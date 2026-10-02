@@ -38,7 +38,7 @@ export default function Sidenav({
 
   return (
     <aside
-      className={`sticky top-0 flex h-screen flex-col bg-white border-r border-slate-200 text-slate-700 transition-all duration-300 z-30 shadow-xs ${
+      className={`sticky top-0 flex h-screen flex-col bg-white border-r border-slate-200 text-slate-700 transition-all duration-300 z-30 ${
         collapsed ? "w-20" : "w-64"
       }`}
     >
@@ -100,7 +100,7 @@ export default function Sidenav({
               title={collapsed ? item.label : undefined}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 isActive
-                  ? "bg-indigo-600 text-white shadow-xs"
+                  ? "bg-blue-600 text-white"
                   : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
               } ${collapsed ? "justify-center" : ""}`}
             >

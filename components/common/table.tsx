@@ -5,7 +5,7 @@ import { ReactNode } from "react"
 /** Card wrapper + horizontal scroll for any admin table. */
 export function TableCard({ children, minWidth = 720 }: { children: ReactNode; minWidth?: number }) {
   return (
-    <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
+    <div className="overflow-x-auto rounded-xl border bg-white">
       <table className="w-full text-sm" style={{ minWidth }}>
         {children}
       </table>
@@ -39,7 +39,7 @@ const toneMap: Record<string, string> = {
   green: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   red: "bg-rose-50 text-rose-700 ring-rose-200",
   amber: "bg-amber-50 text-amber-700 ring-amber-200",
-  blue: "bg-indigo-50 text-indigo-700 ring-indigo-200",
+  blue: "bg-blue-50 text-blue-700 ring-blue-200",
   slate: "bg-slate-100 text-slate-600 ring-slate-200",
 }
 
@@ -75,7 +75,7 @@ export function IconButton({
 }) {
   const tones = {
     slate: "text-slate-500 hover:bg-slate-100 hover:text-slate-700",
-    blue: "text-slate-500 hover:bg-indigo-50 hover:text-indigo-600",
+    blue: "text-slate-500 hover:bg-blue-50 hover:text-blue-600",
     red: "text-slate-500 hover:bg-rose-50 hover:text-rose-600",
   }
   return (

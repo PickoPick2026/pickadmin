@@ -81,6 +81,8 @@ export default function CategoryPage() {
       .update({ categoryStatus: false })
       .eq("categoryID", id)
 
+    setOpen(false)
+    setEditing(null)
     fetchCategories()
   }
 
@@ -106,11 +108,10 @@ export default function CategoryPage() {
 
       <CategoryList
         categories={filtered}
-        onEdit={(c) => {
+        onOpen={(c) => {
           setEditing(c)
           setOpen(true)
         }}
-        onDelete={handleDelete}
       />
 
       {open && (
@@ -121,6 +122,7 @@ export default function CategoryPage() {
             setEditing(null)
           }}
           onSave={handleSave}
+          onDelete={handleDelete}
         />
       )}
     </div>

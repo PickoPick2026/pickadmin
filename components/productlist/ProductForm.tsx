@@ -192,7 +192,7 @@ export default function ProductForm() {
       <div className="col-span-2 space-y-6">
 
         {/* Product Info */}
-        <div className="bg-white p-6 rounded-xl shadow space-y-4">
+        <div className="bg-white p-6 rounded-xl space-y-4">
           <h2 className="font-semibold text-lg">
             {id ? "Edit Product" : "Add Product"}
           </h2>
@@ -219,7 +219,7 @@ export default function ProductForm() {
         </div>
 
         {/* IMAGES */}
-        <div className="bg-white p-6 rounded-xl shadow border border-dashed">
+        <div className="bg-white p-6 rounded-xl border border-dashed">
 
           <input type="file" multiple onChange={handleImageChange} />
 
@@ -247,7 +247,7 @@ export default function ProductForm() {
       <div className="space-y-6">
 
         {/* Pricing */}
-        <div className="bg-white p-6 rounded-xl shadow space-y-4">
+        <div className="bg-white p-6 rounded-xl space-y-4">
           <h3 className="font-semibold">Pricing</h3>
 
           <Input
@@ -259,7 +259,7 @@ export default function ProductForm() {
         </div>
 
         {/* Category */}
-        <div className="bg-white p-6 rounded-xl shadow space-y-4">
+        <div className="bg-white p-6 rounded-xl space-y-4">
           <h3 className="font-semibold">Organize</h3>
 
           <select

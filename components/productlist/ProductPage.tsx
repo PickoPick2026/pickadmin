@@ -5,8 +5,9 @@ import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { LayoutGrid } from "lucide-react"
+import { LayoutGrid, Plus } from "lucide-react"
 import ProductList from "./ProductList"
+import ProductDrawer, { ProductDrawerMode } from "./ProductDrawer"
 import PageHeader from "@/components/common/PageHeader"
 
 export type Product = {
@@ -17,6 +18,8 @@ export type Product = {
   stock: number
   status: string
   imageURL: string
+  description?: string
+  categoryID?: number
   category?: {
     categoryName: string
   }
@@ -25,6 +28,9 @@ export type Product = {
 export default function ProductPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [search, setSearch] = useState("")
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerMode, setDrawerMode] = useState<ProductDrawerMode>("view")
+  const [selected, setSelected] = useState<Product | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -32,44 +38,46 @@ export default function ProductPage() {
   }, [])
 
   const fetchProducts = async () => {
-  const { data, error } = await supabase
-    .from("productTable")
-    .select(`
-      *,
-      category (
-        categoryName
-      )
-    `)
+    const { data, error } = await supabase
+      .from("productTable")
+      .select(`
+        *,
+        category (
+          categoryName
+        )
+      `)
 
-  if (error) {
-    console.error(error)
-    return
+    if (error) {
+      console.error(error)
+      return
+    }
+
+    setProducts(data || [])
   }
-
-  setProducts(data || [])
-}
 
   const filtered = products.filter((p) =>
     p.productName.toLowerCase().includes(search.toLowerCase())
   )
 
-  const handleDelete = async (id: number) => {
-  await supabase
-    .from("productTable")
-    .update({ status: "Closed" }) // ✅ soft delete
-    .eq("productID", id)
+  const openProduct = (p: Product) => {
+    setSelected(p)
+    setDrawerMode("view")
+    setDrawerOpen(true)
+  }
 
-  fetchProducts()
-}
+  const openAdd = () => {
+    setSelected(null)
+    setDrawerMode("add")
+    setDrawerOpen(true)
+  }
 
-const handleEdit = (product: Product) => {
-  // navigate to edit page OR open modal
-  console.log("Edit:", product)
-}
+  const closeDrawer = () => {
+    setDrawerOpen(false)
+    setSelected(null)
+  }
 
   return (
     <div className="space-y-6">
-
       <PageHeader
         title="Product List"
         subtitle={`${products.length} product${products.length === 1 ? "" : "s"}`}
@@ -85,16 +93,24 @@ const handleEdit = (product: Product) => {
                 <LayoutGrid size={16} /> Manage Categories
               </Link>
             </Button>
-            <Button onClick={() => router.push("/product/add")}>+ Add Product</Button>
+            <Button onClick={openAdd}>
+              <Plus size={16} /> Add Product
+            </Button>
           </div>
         }
       />
 
-      <ProductList
-  products={filtered}
-  onEdit={handleEdit}
-  onDelete={handleDelete}
-/>
+      <ProductList products={filtered} onOpen={openProduct} />
+
+      <ProductDrawer
+        open={drawerOpen}
+        mode={drawerMode}
+        product={selected}
+        onClose={closeDrawer}
+        onModeChange={setDrawerMode}
+        onSaved={fetchProducts}
+        onDeleted={fetchProducts}
+      />
     </div>
   )
 }

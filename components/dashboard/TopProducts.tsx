@@ -8,7 +8,7 @@ export default function TopProducts() {
   ]
 
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border">
+    <div className="bg-white rounded-xl p-6 border">
       <h3 className="font-semibold mb-4">Top Products</h3>
 
       <div className="space-y-4">

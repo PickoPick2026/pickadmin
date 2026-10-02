@@ -31,6 +31,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useAuth } from "@/hooks/useAuth"
 import { canDeleteLeads } from "@/config/rolePermissions"
 import { buildGmailLink, buildWhatsAppLink } from "@/components/crm/crmHelpers"
+import Drawer from "@/components/ui/drawer"
+import WhatsAppIcon from "@/components/common/WhatsAppIcon"
+import { useAssignableUsers, userNameById } from "@/components/crm/useAssignableUsers"
 
 export type ServiceRequest = {
   id: string
@@ -49,6 +52,7 @@ export type ServiceRequest = {
   location: string
   payload: Record<string, any>
   admin_notes: string | null
+  assigned_to?: string | null
   created_at: string
   updated_at: string
 }
@@ -69,7 +73,7 @@ const SERVICE_TYPE_META: Record<
   },
   exclusive_sourcing: {
     label: "Exclusive Sourcing",
-    badge: "bg-purple-50 text-purple-700 border-purple-200 ring-purple-100",
+    badge: "bg-blue-50 text-blue-700 border-blue-200 ring-blue-100",
     icon: Sparkles,
   },
   contact: {
@@ -79,7 +83,7 @@ const SERVICE_TYPE_META: Record<
   },
   assisted_buy: {
     label: "Assisted Buy",
-    badge: "bg-indigo-50 text-indigo-700 border-indigo-200 ring-indigo-100",
+    badge: "bg-blue-50 text-blue-700 border-blue-200 ring-blue-100",
     icon: PackageCheck,
   },
 }
@@ -96,7 +100,7 @@ const STATUS_LIST = ["NEW", "CONTACTED", "IN_PROGRESS", "COMPLETED", "CLOSED"]
 
 function DetailBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">{title}</h4>
       <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">{children}</div>
     </div>
@@ -127,6 +131,9 @@ export default function ServiceRequestsPage() {
   const [selectedReq, setSelectedReq] = useState<ServiceRequest | null>(null)
   const [notes, setNotes] = useState("")
   const [isSavingNotes, setIsSavingNotes] = useState(false)
+
+  // Team assignment
+  const { users: assignableUsers } = useAssignableUsers()
 
   // Bulk actions (Delete Leads permission only)
   const { role, session } = useAuth()
@@ -191,6 +198,36 @@ export default function ServiceRequestsPage() {
         )
       }
       toast.error(`Unable to update status: ${err?.message || err}`)
+    }
+  }
+
+  const handleAssign = async (id: string, userId: string) => {
+    const prevOwner = requests.find((r) => r.id === id)?.assigned_to ?? null
+    const nextOwner = userId || null
+
+    setRequests((list) =>
+      list.map((r) => (r.id === id ? { ...r, assigned_to: nextOwner } : r)),
+    )
+    if (selectedReq?.id === id) {
+      setSelectedReq((curr) => (curr ? { ...curr, assigned_to: nextOwner } : null))
+    }
+
+    try {
+      const { error } = await supabase
+        .from("service_requests")
+        .update({ assigned_to: nextOwner })
+        .eq("id", id)
+
+      if (error) throw error
+      toast.success(nextOwner ? "Ticket assigned" : "Assignment cleared")
+    } catch (err: any) {
+      setRequests((list) =>
+        list.map((r) => (r.id === id ? { ...r, assigned_to: prevOwner } : r)),
+      )
+      if (selectedReq?.id === id) {
+        setSelectedReq((curr) => (curr ? { ...curr, assigned_to: prevOwner } : null))
+      }
+      toast.error(`Unable to assign: ${err?.message || err}`)
     }
   }
 
@@ -327,6 +364,23 @@ export default function ServiceRequestsPage() {
     }
   }, [requests])
 
+  const drawerWaLink = selectedReq
+    ? buildWhatsAppLink(
+        selectedReq.phone,
+        `Hello ${selectedReq.customer_name}, regarding your Pick O Pick ${
+          SERVICE_TYPE_META[selectedReq.service_type]?.label || "service"
+        } request (${selectedReq.request_code}):`,
+      )
+    : null
+
+  const drawerGmailLink = selectedReq
+    ? buildGmailLink(
+        selectedReq.email,
+        `Pick O Pick Request Update - ${selectedReq.request_code}`,
+        `Hello ${selectedReq.customer_name},\n\nRegarding your Pick O Pick request (${selectedReq.request_code}).\n\nBest regards,\nPick O Pick Team`,
+      )
+    : null
+
   return (
     <div className="space-y-6">
       {/* Header Bar */}
@@ -343,7 +397,7 @@ export default function ServiceRequestsPage() {
           <button
             onClick={loadRequests}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition shadow-2xs cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
           >
             <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
             Refresh
@@ -353,30 +407,30 @@ export default function ServiceRequestsPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <span className="text-xs font-semibold text-slate-500">Total Requests</span>
           <p className="text-2xl font-black text-slate-900 mt-1">{stats.total}</p>
         </div>
-        <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-4 shadow-2xs">
+        <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-4">
           <span className="text-xs font-bold text-rose-700">New / Unactioned</span>
           <p className="text-2xl font-black text-rose-800 mt-1">{stats.newCount}</p>
         </div>
-        <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-4 shadow-2xs">
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-4">
           <span className="text-xs font-bold text-blue-700">Order & Send</span>
           <p className="text-2xl font-black text-blue-800 mt-1">{stats.orderSend}</p>
         </div>
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 shadow-2xs">
-          <span className="text-xs font-bold text-emerald-700">Buy & Ship</span>
-          <p className="text-2xl font-black text-emerald-800 mt-1">{stats.buyShip}</p>
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-4">
+          <span className="text-xs font-bold text-blue-700">Buy & Ship</span>
+          <p className="text-2xl font-black text-blue-800 mt-1">{stats.buyShip}</p>
         </div>
-        <div className="rounded-2xl border border-purple-200 bg-purple-50/40 p-4 shadow-2xs">
-          <span className="text-xs font-bold text-purple-700">Exclusive Sourcing</span>
-          <p className="text-2xl font-black text-purple-800 mt-1">{stats.exclusive}</p>
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-4">
+          <span className="text-xs font-bold text-blue-700">Exclusive Sourcing</span>
+          <p className="text-2xl font-black text-blue-800 mt-1">{stats.exclusive}</p>
         </div>
       </div>
 
       {/* Filter Bar: Tabs & Controls */}
-      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4">
         {/* Type Tabs */}
         <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           {[
@@ -391,7 +445,7 @@ export default function ServiceRequestsPage() {
               onClick={() => setTypeFilter(tab.id)}
               className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
                 typeFilter === tab.id
-                  ? "bg-slate-900 text-white shadow-xs"
+                  ? "bg-blue-600 text-white"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -409,7 +463,7 @@ export default function ServiceRequestsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by reference ID, customer name, phone, email, city, items..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-4 py-2 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-4 py-2 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
             />
           </div>
 
@@ -419,7 +473,7 @@ export default function ServiceRequestsPage() {
               aria-label="Filter by status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full sm:w-auto rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-600 cursor-pointer"
+              className="w-full sm:w-auto rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 cursor-pointer"
             >
               <option value="all">All Statuses</option>
               {STATUS_LIST.map((s) => (
@@ -434,8 +488,8 @@ export default function ServiceRequestsPage() {
 
       {/* Bulk action bar (Delete Leads permission only) */}
       {canDelete && selectedIds.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
-          <span className="text-sm font-bold text-indigo-900">
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+          <span className="text-sm font-bold text-blue-900">
             {selectedIds.length} selected
           </span>
           <button
@@ -443,7 +497,7 @@ export default function ServiceRequestsPage() {
               setSelectedIds([])
               setConfirmBulkDelete(false)
             }}
-            className="cursor-pointer text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+            className="cursor-pointer text-xs font-semibold text-blue-600 hover:text-blue-800"
           >
             Clear selection
           </button>
@@ -460,7 +514,7 @@ export default function ServiceRequestsPage() {
               className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold text-white transition disabled:opacity-60 ${
                 confirmBulkDelete
                   ? "bg-rose-600 hover:bg-rose-700"
-                  : "bg-slate-900 hover:bg-slate-800"
+                  : "bg-blue-600 hover:bg-blue-700"
               }`}
             >
               <Trash2 size={14} />
@@ -475,7 +529,7 @@ export default function ServiceRequestsPage() {
       )}
 
       {/* Requests Table */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-100 bg-slate-50/75 text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -493,7 +547,6 @@ export default function ServiceRequestsPage() {
                 <th className="p-3.5">Service Type</th>
                 <th className="p-3.5">Customer</th>
                 <th className="p-3.5">Contact</th>
-                <th className="p-3.5">Requirements Preview</th>
                 <th className="p-3.5">Status</th>
                 <th className="p-3.5">Submitted On</th>
                 <th className="p-3.5 text-right">Actions</th>
@@ -503,17 +556,17 @@ export default function ServiceRequestsPage() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={canDelete ? 9 : 8}
+                    colSpan={canDelete ? 8 : 7}
                     className="p-12 text-center text-slate-400"
                   >
-                    <RefreshCw className="mx-auto mb-2 animate-spin text-indigo-600" size={24} />
+                    <RefreshCw className="mx-auto mb-2 animate-spin text-blue-600" size={24} />
                     <p className="text-xs font-semibold">Loading service requests…</p>
                   </td>
                 </tr>
               ) : filteredRequests.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={canDelete ? 9 : 8}
+                    colSpan={canDelete ? 8 : 7}
                     className="p-12 text-center text-slate-400"
                   >
                     <AlertCircle className="mx-auto mb-2 text-slate-300" size={28} />
@@ -537,22 +590,9 @@ export default function ServiceRequestsPage() {
                     badge: "bg-slate-100 text-slate-700",
                   }
 
-                  const previewText =
-                    req.payload?.itemsToShip ||
-                    req.payload?.whatToBuy ||
-                    req.payload?.requestedItems ||
-                    req.payload?.message ||
-                    req.payload?.productLinks ||
-                    req.location
-
                   const waLink = buildWhatsAppLink(
                     req.phone,
                     `Hello ${req.customer_name}, regarding your Pick O Pick ${typeMeta.label} request (${req.request_code}).`,
-                  )
-                  const gmailLink = buildGmailLink(
-                    req.email,
-                    `Regarding Pick O Pick Service Request ${req.request_code}`,
-                    `Hello ${req.customer_name},\n\nRegarding your service request (${req.request_code}) for ${typeMeta.label}.\n\nPlease let us know if you need any assistance.\n\nBest regards,\nPick O Pick Team`,
                   )
 
                   return (
@@ -572,8 +612,10 @@ export default function ServiceRequestsPage() {
                       )}
 
                       {/* Code */}
-                      <td className="p-3.5 font-mono text-xs font-bold text-indigo-700">
-                        {req.request_code}
+                      <td className="p-3.5">
+                        <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 font-mono text-[11px] font-bold text-blue-700">
+                          {req.request_code}
+                        </span>
                       </td>
 
                       {/* Service Type */}
@@ -606,20 +648,13 @@ export default function ServiceRequestsPage() {
                         </div>
                       </td>
 
-                      {/* Requirements Preview */}
-                      <td className="p-3.5 max-w-[220px]">
-                        <p className="text-xs text-slate-700 line-clamp-2 leading-relaxed">
-                          {previewText || "No extra details"}
-                        </p>
-                      </td>
-
                       {/* Status Selector */}
                       <td className="p-3.5">
                         <select
                           aria-label="Change status"
                           value={req.status}
                           onChange={(e) => handleUpdateStatus(req.id, e.target.value)}
-                          className={`rounded-lg border px-2.5 py-1 text-xs font-bold cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 ${statusInfo.badge}`}
+                          className={`rounded-lg border px-2.5 py-1 text-xs font-bold cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${statusInfo.badge}`}
                         >
                           {STATUS_LIST.map((s) => (
                             <option key={s} value={s}>
@@ -653,25 +688,14 @@ export default function ServiceRequestsPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Chat on WhatsApp"
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100"
                             >
-                              <MessageSquare size={13} />
-                            </a>
-                          )}
-                          {gmailLink && (
-                            <a
-                              href={gmailLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="Compose in Gmail (pre-filled)"
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
-                            >
-                              <Mail size={13} />
+                              <WhatsAppIcon size={13} />
                             </a>
                           )}
                           <button
                             onClick={() => handleOpenDetails(req)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition cursor-pointer"
                           >
                             <Eye size={13} />
                             <span>View</span>
@@ -687,94 +711,69 @@ export default function ServiceRequestsPage() {
         </div>
       </div>
 
-      {/* Detail Slide-over / Modal */}
+      {/* Detail Drawer */}
       {selectedReq && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs">
-          <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white shadow-2xl border border-slate-200 p-6 sm:p-8">
-            {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-slate-100 pb-5">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">
-                    {selectedReq.request_code}
-                  </span>
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border ${
-                      SERVICE_TYPE_META[selectedReq.service_type]?.badge || "bg-slate-100 text-slate-700"
-                    }`}
-                  >
-                    {SERVICE_TYPE_META[selectedReq.service_type]?.label ||
-                      selectedReq.service_type.replace(/_/g, " ")}
-                  </span>
-                </div>
-                <h3 className="mt-2 text-xl font-extrabold text-slate-900">
-                  {selectedReq.customer_name}
-                </h3>
-              </div>
-
-              <button
-                onClick={() => setSelectedReq(null)}
-                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition cursor-pointer"
+        <Drawer
+          open
+          onClose={() => setSelectedReq(null)}
+          title={selectedReq.customer_name}
+          subtitle={`Submitted ${new Date(selectedReq.created_at).toLocaleString()}`}
+          wide
+          actions={
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 font-mono text-[11px] font-bold text-blue-700">
+                {selectedReq.request_code}
+              </span>
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border ${
+                  SERVICE_TYPE_META[selectedReq.service_type]?.badge || "bg-slate-100 text-slate-700"
+                }`}
               >
-                <X size={20} />
-              </button>
+                {SERVICE_TYPE_META[selectedReq.service_type]?.label ||
+                  selectedReq.service_type.replace(/_/g, " ")}
+              </span>
             </div>
-
-            {/* Modal Quick Actions Bar */}
-            <div className="mt-5 flex flex-wrap gap-2">
-              {buildWhatsAppLink(
-                selectedReq.phone,
-                `Hello ${selectedReq.customer_name}, regarding your Pick O Pick ${
-                  SERVICE_TYPE_META[selectedReq.service_type]?.label || "service"
-                } request (${selectedReq.request_code}):`,
-              ) && (
+          }
+        >
+          <div className="space-y-4">
+            {/* Quick contact actions */}
+            <div className="flex flex-wrap gap-2">
+              {drawerWaLink && (
                 <a
-                  href={
-                    buildWhatsAppLink(
-                      selectedReq.phone,
-                      `Hello ${selectedReq.customer_name}, regarding your Pick O Pick ${
-                        SERVICE_TYPE_META[selectedReq.service_type]?.label || "service"
-                      } request (${selectedReq.request_code}):`,
-                    ) || "#"
-                  }
+                  href={drawerWaLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white px-3.5 py-2 text-xs font-bold transition shadow-xs"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white px-3.5 py-2 text-xs font-bold transition"
                 >
-                  <MessageSquare size={14} />
-                  Open WhatsApp
+                  <WhatsAppIcon size={14} />
+                  WhatsApp
                 </a>
               )}
 
-              {buildGmailLink(
-                selectedReq.email,
-                `Pick O Pick Request Update - ${selectedReq.request_code}`,
-                `Hello ${selectedReq.customer_name},\n\nRegarding your Pick O Pick request (${selectedReq.request_code}).\n\nBest regards,\nPick O Pick Team`,
-              ) && (
+              {drawerGmailLink && (
                 <a
-                  href={
-                    buildGmailLink(
-                      selectedReq.email,
-                      `Pick O Pick Request Update - ${selectedReq.request_code}`,
-                      `Hello ${selectedReq.customer_name},\n\nRegarding your Pick O Pick request (${selectedReq.request_code}).\n\nBest regards,\nPick O Pick Team`,
-                    ) || "#"
-                  }
+                  href={drawerGmailLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2 text-xs font-bold transition shadow-xs"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 text-xs font-bold transition"
                 >
                   <Mail size={14} />
                   Compose in Gmail
                 </a>
               )}
+            </div>
 
-              <div className="ml-auto flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-500">Status:</span>
+            {/* Workflow: status + assignment */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Status
+                </label>
                 <select
-                  aria-label="Update modal status"
+                  aria-label="Update status"
                   value={selectedReq.status}
                   onChange={(e) => handleUpdateStatus(selectedReq.id, e.target.value)}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer"
                 >
                   {STATUS_LIST.map((s) => (
                     <option key={s} value={s}>
@@ -783,10 +782,28 @@ export default function ServiceRequestsPage() {
                   ))}
                 </select>
               </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Assigned To
+                </label>
+                <select
+                  aria-label="Assign ticket"
+                  value={selectedReq.assigned_to ?? ""}
+                  onChange={(e) => handleAssign(selectedReq.id, e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer"
+                >
+                  <option value="">Unassigned</option>
+                  {assignableUsers.map((u) => (
+                    <option key={u.adminLoginID} value={u.adminLoginID}>
+                      {u.username} — {u.role}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {/* Modal Content Sections */}
-            <div className="mt-6 space-y-4">
+            <div className="space-y-4">
               {/* Customer Info Card */}
               <DetailBlock title="Customer Details">
                 <FieldItem label="Full Name" value={selectedReq.customer_name} />
@@ -910,7 +927,7 @@ export default function ServiceRequestsPage() {
                 )}
 
               {/* Internal Admin Notes */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Internal Team Notes
                 </h4>
@@ -919,31 +936,21 @@ export default function ServiceRequestsPage() {
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add internal staff notes about customer communication, quotes shared, or courier tracking..."
                   rows={3}
-                  className="mt-2 w-full resize-none rounded-xl border border-slate-200 p-3 text-xs font-medium text-slate-800 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                  className="mt-2 w-full resize-none rounded-xl border border-slate-200 p-3 text-xs font-medium text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
                 />
                 <div className="mt-3 flex justify-end">
                   <button
                     onClick={handleSaveNotes}
                     disabled={isSavingNotes}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700 disabled:opacity-60 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-60 cursor-pointer"
                   >
                     {isSavingNotes ? "Saving..." : "Save Notes"}
                   </button>
                 </div>
               </div>
             </div>
-
-            {/* Modal Footer */}
-            <div className="mt-6 flex justify-end border-t border-slate-100 pt-4">
-              <button
-                onClick={() => setSelectedReq(null)}
-                className="rounded-xl bg-slate-100 hover:bg-slate-200 px-5 py-2 text-xs font-bold text-slate-700 transition cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
           </div>
-        </div>
+        </Drawer>
       )}
     </div>
   )

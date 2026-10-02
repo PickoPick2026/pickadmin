@@ -32,6 +32,8 @@ import {
   buildWhatsAppLink,
   resolveAssignedTo,
 } from "@/components/crm/crmHelpers";
+import Drawer from "@/components/ui/drawer";
+import WhatsAppIcon from "@/components/common/WhatsAppIcon";
 
 export type OrderItem = {
   id: string;
@@ -82,7 +84,7 @@ const STATUSES = [
 const statusTone: Record<string, string> = {
   QUOTE_REQUESTED: "bg-amber-50 text-amber-800 ring-amber-200 border-amber-300",
   CONTACTED: "bg-blue-50 text-blue-800 ring-blue-200 border-blue-300",
-  QUOTED: "bg-indigo-50 text-indigo-800 ring-indigo-200 border-indigo-300",
+  QUOTED: "bg-blue-50 text-blue-800 ring-blue-200 border-blue-300",
   COMPLETED:
     "bg-emerald-50 text-emerald-800 ring-emerald-200 border-emerald-300",
   CANCELLED: "bg-slate-100 text-slate-700 ring-slate-200 border-slate-300",
@@ -372,7 +374,7 @@ export default function QuotesPage() {
         label: "Total Requests",
         value: quotes.length,
         icon: ShoppingBag,
-        color: "bg-slate-900 text-white",
+        color: "bg-blue-600 text-white",
       },
       {
         label: "Quote Requested",
@@ -390,7 +392,7 @@ export default function QuotesPage() {
         label: "Quoted",
         value: quotes.filter((q) => q.status === "QUOTED").length,
         icon: IndianRupee,
-        color: "bg-indigo-50 text-indigo-700",
+        color: "bg-blue-50 text-blue-700",
       },
       {
         label: "Completed",
@@ -417,7 +419,7 @@ export default function QuotesPage() {
         <button
           onClick={loadQuotes}
           disabled={loading}
-          className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+          className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
         >
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
           Refresh
@@ -431,7 +433,7 @@ export default function QuotesPage() {
           return (
             <div
               key={s.label}
-              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+              className="rounded-xl border border-slate-200 bg-white p-4"
             >
               <div
                 className={`flex h-9 w-9 items-center justify-center rounded-lg ${s.color}`}
@@ -456,7 +458,7 @@ export default function QuotesPage() {
             onClick={() => setStatusFilter("all")}
             className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
               statusFilter === "all"
-                ? "bg-indigo-600 text-white shadow-sm"
+                ? "bg-blue-600 text-white"
                 : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
             }`}
           >
@@ -470,7 +472,7 @@ export default function QuotesPage() {
                 onClick={() => setStatusFilter(st)}
                 className={`cursor-pointer whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                   statusFilter === st
-                    ? "bg-indigo-600 text-white shadow-sm"
+                    ? "bg-blue-600 text-white"
                     : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
                 }`}
               >
@@ -490,19 +492,19 @@ export default function QuotesPage() {
             placeholder="Search code, customer, product..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm text-slate-900 outline-none transition focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100"
+            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
           />
         </div>
       </div>
 
       {/* Main Quote Requests Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full min-w-[960px] text-left text-sm">
           <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
             <tr>
               <th className="p-3.5">Quote Ref Code</th>
               <th className="p-3.5">Customer Details</th>
-              <th className="p-3.5">Products Picked</th>
+              <th className="p-3.5">Products</th>
               <th className="p-3.5">Total Units</th>
               <th className="p-3.5">Status</th>
               <th className="p-3.5">Owner</th>
@@ -518,7 +520,7 @@ export default function QuotesPage() {
                   <div className="flex items-center justify-center gap-2">
                     <RefreshCw
                       size={18}
-                      className="animate-spin text-indigo-600"
+                      className="animate-spin text-blue-600"
                     />
                     <span>Loading quote requests...</span>
                   </div>
@@ -563,7 +565,7 @@ export default function QuotesPage() {
                   >
                     {/* Code */}
                     <td className="p-3.5 align-middle">
-                      <span className="font-mono text-xs font-bold text-[#0B56D9]">
+                      <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 font-mono text-[11px] font-bold text-[#0B56D9]">
                         {quote.order_code}
                       </span>
                       <p className="mt-1 text-[11px] text-slate-400">
@@ -588,45 +590,13 @@ export default function QuotesPage() {
                       )}
                     </td>
 
-                    {/* Products Preview */}
+                    {/* Products Count */}
                     <td className="p-3.5 align-middle">
-                      <div className="flex flex-col gap-1.5 max-w-[280px]">
-                        {(quote.order_items || []).slice(0, 3).map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex items-center gap-2"
-                          >
-                            {item.image ? (
-                              <img
-                                src={item.image}
-                                alt={item.name}
-                                className="h-8 w-8 rounded-md object-cover border border-slate-200 shrink-0"
-                              />
-                            ) : (
-                              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-slate-400 shrink-0">
-                                <Package size={14} />
-                              </div>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <p
-                                className="truncate text-xs font-medium text-slate-800"
-                                title={item.name}
-                              >
-                                {item.name}
-                              </p>
-                            </div>
-                            <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
-                              ×{item.quantity}
-                            </span>
-                          </div>
-                        ))}
-                        {(quote.order_items || []).length > 3 && (
-                          <p className="text-[11px] font-semibold text-indigo-600">
-                            +{(quote.order_items || []).length - 3} more
-                            product(s)
-                          </p>
-                        )}
-                      </div>
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+                        <Package size={12} />
+                        {(quote.order_items || []).length}{" "}
+                        {(quote.order_items || []).length === 1 ? "product" : "products"}
+                      </span>
                     </td>
 
                     {/* Total Units */}
@@ -665,7 +635,7 @@ export default function QuotesPage() {
                             assignQuote(quote, e.target.value || null)
                           }
                           disabled={assigning}
-                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800 outline-none hover:border-slate-300 focus:border-indigo-500"
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800 outline-none hover:border-slate-300 focus:border-blue-500"
                         >
                           <option value="">Unassigned</option>
                           {users.map((u) => (
@@ -677,7 +647,7 @@ export default function QuotesPage() {
                         {quote.assigned_to && (
                           <span
                             title={`Owner: ${userNameById(users, quote.assigned_to) || "user"}`}
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold uppercase text-white"
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold uppercase text-white"
                           >
                             {(userNameById(users, quote.assigned_to) || "U")[0]}
                           </span>
@@ -731,9 +701,9 @@ export default function QuotesPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Chat with customer on WhatsApp"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100"
                           >
-                            <MessageCircle size={14} />
+                            <WhatsAppIcon size={14} />
                           </a>
                         )}
                         {gmailLink && (
@@ -749,7 +719,7 @@ export default function QuotesPage() {
                         )}
                         <button
                           onClick={() => openModal(quote)}
-                          className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                          className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
                         >
                           <Eye size={13} />
                           View
@@ -757,7 +727,7 @@ export default function QuotesPage() {
                         <button
                           onClick={() => setActionQuote(quote)}
                           title="Assign owner & manage remarks"
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-indigo-300 hover:text-indigo-600"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-blue-300 hover:text-blue-600"
                         >
                           <UserPlus size={14} />
                         </button>
@@ -771,56 +741,36 @@ export default function QuotesPage() {
         </table>
       </div>
 
-      {/* Quote Details & Edit Drawer Modal */}
+      {/* Quote Details & Edit Drawer */}
       {selectedQuote && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-xs sm:items-center sm:p-4"
-          onClick={() => setSelectedQuote(null)}
-        >
-          <div
-            className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl bg-white p-6 shadow-2xl sm:rounded-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm font-bold text-[#0B56D9]">
-                    {selectedQuote.order_code}
-                  </span>
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ${
-                      statusTone[selectedQuote.status] ||
-                      "bg-slate-100 text-slate-800"
-                    }`}
-                  >
-                    {statusLabels[selectedQuote.status] || selectedQuote.status}
-                  </span>
-                </div>
-                <h2 className="mt-1 text-xl font-bold text-slate-900">
-                  {selectedQuote.customer_name || "Guest Customer"}
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Requested on{" "}
-                  {new Date(selectedQuote.created_at).toLocaleString("en-IN")}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {canDelete && (
-                  <DeleteLeadButton
-                    onDelete={() => deleteQuote(selectedQuote)}
-                  />
-                )}
-                <button
-                  onClick={() => setSelectedQuote(null)}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  Close
-                </button>
-              </div>
+        <Drawer
+          open
+          onClose={() => setSelectedQuote(null)}
+          title={selectedQuote.customer_name || "Guest Customer"}
+          subtitle={`Requested on ${new Date(selectedQuote.created_at).toLocaleString("en-IN")}`}
+          wide
+          actions={
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 font-mono text-[11px] font-bold text-[#0B56D9]">
+                {selectedQuote.order_code}
+              </span>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ${
+                  statusTone[selectedQuote.status] ||
+                  "bg-slate-100 text-slate-800"
+                }`}
+              >
+                {statusLabels[selectedQuote.status] || selectedQuote.status}
+              </span>
+              {canDelete && (
+                <DeleteLeadButton
+                  onDelete={() => deleteQuote(selectedQuote)}
+                />
+              )}
             </div>
-
+          }
+        >
+          <div className="space-y-5">
             {/* Customer & Shipping Info */}
             <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
@@ -936,7 +886,7 @@ export default function QuotesPage() {
                                 const t = parseFloat(editTax) || 0;
                                 setEditTotal(String(newSubtotal + s + t));
                               }}
-                              className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-right text-sm font-semibold outline-none focus:border-indigo-600"
+                              className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-right text-sm font-semibold outline-none focus:border-blue-600"
                               placeholder="0"
                             />
                           </td>
@@ -971,7 +921,7 @@ export default function QuotesPage() {
                       const t = parseFloat(editTax) || 0;
                       setEditTotal(String(sub + s + t));
                     }}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-600"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm font-semibold text-slate-800 outline-none focus:border-blue-600"
                   />
                 </div>
                 <div>
@@ -988,7 +938,7 @@ export default function QuotesPage() {
                       const t = parseFloat(editTax) || 0;
                       setEditTotal(String(sub + s + t));
                     }}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-600"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm font-semibold text-slate-800 outline-none focus:border-blue-600"
                   />
                 </div>
                 <div>
@@ -1005,7 +955,7 @@ export default function QuotesPage() {
                       const t = parseFloat(e.target.value) || 0;
                       setEditTotal(String(sub + s + t));
                     }}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-600"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm font-semibold text-slate-800 outline-none focus:border-blue-600"
                   />
                 </div>
                 <div>
@@ -1016,7 +966,7 @@ export default function QuotesPage() {
                     type="number"
                     value={editTotal}
                     onChange={(e) => setEditTotal(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-indigo-300 bg-indigo-50/40 p-2 text-sm font-bold text-indigo-900 outline-none focus:border-indigo-600"
+                    className="mt-1 w-full rounded-lg border border-blue-300 bg-blue-50/40 p-2 text-sm font-bold text-blue-900 outline-none focus:border-blue-600"
                   />
                 </div>
               </div>
@@ -1029,7 +979,7 @@ export default function QuotesPage() {
                   <select
                     value={editStatus}
                     onChange={(e) => setEditStatus(e.target.value)}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold outline-none focus:border-indigo-600"
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold outline-none focus:border-blue-600"
                   >
                     {STATUSES.map((st) => (
                       <option key={st} value={st}>
@@ -1043,14 +993,14 @@ export default function QuotesPage() {
                   type="button"
                   onClick={saveQuoteChanges}
                   disabled={isSaving}
-                  className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-indigo-600 px-5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
+                  className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-blue-600 px-5 py-2 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-60"
                 >
                   {isSaving ? "Saving..." : "Save Quote & Prices"}
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        </Drawer>
       )}
 
       {/* CRM Actions Drawer (Owner & Remarks) */}

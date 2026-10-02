@@ -30,6 +30,8 @@ import {
   buildWhatsAppLink,
   resolveAssignedTo,
 } from "@/components/crm/crmHelpers";
+import Drawer from "@/components/ui/drawer";
+import WhatsAppIcon from "@/components/common/WhatsAppIcon";
 
 type NriRequest = {
   id: string;
@@ -327,14 +329,14 @@ export default function NriRequestsPage() {
         label: "All requests",
         value: requests.length,
         icon: ClipboardList,
-        tone: "bg-slate-900 text-white",
+        tone: "bg-blue-600 text-white",
       },
       {
         label: "Free consultations",
         value: requests.filter((item) => item.request_type === "consultation")
           .length,
         icon: Headphones,
-        tone: "bg-indigo-50 text-indigo-700",
+        tone: "bg-blue-50 text-blue-700",
       },
       {
         label: "Slot reservations",
@@ -342,14 +344,14 @@ export default function NriRequestsPage() {
           (item) => item.request_type === "slot_reservation",
         ).length,
         icon: CalendarClock,
-        tone: "bg-amber-50 text-amber-700",
+        tone: "bg-blue-50 text-blue-700",
       },
       {
         label: "Pickup requests",
         value: requests.filter((item) => item.request_type === "pickup_request")
           .length,
         icon: Truck,
-        tone: "bg-emerald-50 text-emerald-700",
+        tone: "bg-blue-50 text-blue-700",
       },
       {
         label: "Pending action",
@@ -498,7 +500,7 @@ export default function NriRequestsPage() {
           return (
             <div
               key={stat.label}
-              className="rounded-xl border bg-white p-4 shadow-sm"
+              className="rounded-xl border bg-white p-4"
             >
               <div
                 className={`flex h-9 w-9 items-center justify-center rounded-lg ${stat.tone}`}
@@ -529,7 +531,7 @@ export default function NriRequestsPage() {
             onClick={() => setFilter(item.value)}
             className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${
               filter === item.value
-                ? "bg-slate-900 text-white"
+                ? "bg-blue-600 text-white"
                 : "bg-white text-slate-600 ring-1 ring-slate-200"
             }`}
           >
@@ -538,7 +540,7 @@ export default function NriRequestsPage() {
         ))}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border bg-white">
         <table className="min-w-[960px] w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
@@ -558,7 +560,7 @@ export default function NriRequestsPage() {
                 <td className="p-6 text-center text-slate-500" colSpan={8}>
                   <RefreshCw
                     size={18}
-                    className="mr-2 inline animate-spin text-indigo-600"
+                    className="mr-2 inline animate-spin text-blue-600"
                   />{" "}
                   Loading requests…
                 </td>
@@ -587,10 +589,10 @@ export default function NriRequestsPage() {
                     className="border-t align-middle hover:bg-slate-50/50"
                   >
                     <td className="p-3">
-                      <p className="font-mono text-xs font-semibold text-orange-600">
+                      <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 font-mono text-[11px] font-bold text-blue-700">
                         {request.request_code}
-                      </p>
-                      <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+                      </span>
+                      <p className="mt-1 text-[11px] font-medium text-slate-500">
                         {typeLabels[request.request_type]}
                       </p>
                     </td>
@@ -639,7 +641,7 @@ export default function NriRequestsPage() {
                             assignRequest(request, e.target.value || null)
                           }
                           disabled={assigning}
-                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800 outline-none hover:border-slate-300 focus:border-indigo-500"
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800 outline-none hover:border-slate-300 focus:border-blue-500"
                         >
                           <option value="">Unassigned</option>
                           {users.map((u) => (
@@ -651,7 +653,7 @@ export default function NriRequestsPage() {
                         {request.assigned_to && (
                           <span
                             title={`Owner: ${userNameById(users, request.assigned_to) || "user"}`}
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold uppercase text-white"
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold uppercase text-white"
                           >
                             {
                               (userNameById(users, request.assigned_to) ||
@@ -679,9 +681,9 @@ export default function NriRequestsPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Chat on WhatsApp"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100"
                           >
-                            <MessageCircle size={14} />
+                            <WhatsAppIcon size={14} />
                           </a>
                         )}
                         {gmailLink && (
@@ -698,7 +700,7 @@ export default function NriRequestsPage() {
                         <button
                           onClick={() => setSelected(request)}
                           title="View full details"
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-indigo-700 hover:bg-indigo-50"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-blue-700 hover:bg-blue-50"
                         >
                           <Eye size={15} />
                         </button>
@@ -720,51 +722,39 @@ export default function NriRequestsPage() {
       </div>
 
       {selected && (
-        <div
-          className="fixed inset-0 z-50 flex items-end bg-slate-900/40 p-0 sm:items-center sm:justify-center sm:p-4"
-          onClick={() => setSelected(null)}
-        >
-          <div
-            className="max-h-[88vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:max-w-2xl sm:rounded-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="font-mono text-xs font-bold text-orange-600">
-                  {selected.request_code}
-                </p>
-                <h2 className="mt-1 text-xl font-bold">
-                  {typeLabels[selected.request_type]}
-                </h2>
-              </div>
-              <div className="flex items-center gap-2">
-                {canDelete && (
-                  <DeleteLeadButton onDelete={() => deleteRequest(selected)} />
-                )}
-                <button
-                  onClick={() => setSelected(null)}
-                  className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
-                >
-                  Close
-                </button>
-              </div>
+        <Drawer
+          open
+          onClose={() => setSelected(null)}
+          title={typeLabels[selected.request_type]}
+          subtitle={`Received ${new Date(selected.created_at).toLocaleString()}`}
+          wide
+          actions={
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 font-mono text-[11px] font-bold text-blue-700">
+                {selected.request_code}
+              </span>
+              {canDelete && (
+                <DeleteLeadButton onDelete={() => deleteRequest(selected)} />
+              )}
             </div>
-            <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+          }
+        >
+          <div className="space-y-4">
+            <div className="rounded-xl bg-blue-50 p-3 text-xs text-slate-600 ring-1 ring-blue-100">
               <span className="font-bold text-slate-800">Status:</span>{" "}
-              {selected.status} <span className="mx-2 text-slate-300">•</span>{" "}
-              Received {new Date(selected.created_at).toLocaleString()}
+              {selected.status}
             </div>
             <RequestDetails request={selected} />
-            <details className="mt-5 rounded-xl border border-slate-200 bg-white">
+            <details className="rounded-xl border border-slate-200 bg-white">
               <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-slate-800">
                 View raw submitted JSON
               </summary>
-              <pre className="max-h-80 overflow-auto border-t bg-slate-950 p-4 text-xs leading-5 text-slate-100">
+              <pre className="max-h-80 overflow-auto border-t border-blue-100 bg-blue-50 p-4 text-xs leading-5 text-blue-900">
                 {JSON.stringify(selected.payload, null, 2)}
               </pre>
             </details>
           </div>
-        </div>
+        </Drawer>
       )}
 
       <LeadActionsDrawer

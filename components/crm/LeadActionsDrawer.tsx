@@ -3,12 +3,12 @@
 import { useState } from "react";
 import {
   Mail,
-  MessageCircle,
   StickyNote,
   Trash2,
   UserPlus,
 } from "lucide-react";
 import Drawer from "@/components/ui/drawer";
+import WhatsAppIcon from "@/components/common/WhatsAppIcon";
 import { AdminUser, userNameById } from "@/components/crm/useAssignableUsers";
 import {
   Remark,
@@ -112,7 +112,7 @@ export default function LeadActionsDrawer({
       title={
         <div>
           {code && (
-            <span className="block font-mono text-xs font-bold text-orange-600">
+            <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 font-mono text-[11px] font-bold text-blue-700">
               {code}
             </span>
           )}
@@ -130,7 +130,7 @@ export default function LeadActionsDrawer({
               title="Chat with customer on WhatsApp"
               className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
             >
-              <MessageCircle size={16} />
+              <WhatsAppIcon size={16} />
             </a>
           )}
           {gmailLink && (
@@ -158,7 +158,7 @@ export default function LeadActionsDrawer({
               value={assignedTo ?? ""}
               onChange={(e) => onAssign(e.target.value || null)}
               disabled={assigning}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-indigo-500 disabled:opacity-60"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-500 disabled:opacity-60"
             >
               <option value="">Unassigned</option>
               {users.map((u) => (
@@ -172,7 +172,7 @@ export default function LeadActionsDrawer({
           {assignedTo && (
             <p className="mt-1 text-[11px] text-slate-500">
               Current owner:{" "}
-              <span className="font-semibold text-indigo-700">
+              <span className="font-semibold text-blue-700">
                 {userNameById(users, assignedTo) ?? `#${assignedTo}`}
               </span>
             </p>
@@ -186,7 +186,7 @@ export default function LeadActionsDrawer({
           <select
             value={status}
             onChange={(e) => onStatusChange(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-500"
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500"
           >
             {statuses.map((s) => (
               <option key={s.value} value={s.value}>
@@ -225,7 +225,7 @@ export default function LeadActionsDrawer({
               value={remarkText}
               onChange={(e) => setRemarkText(e.target.value)}
               placeholder="Call outcome, next follow-up, note for the team…"
-              className="w-full resize-none rounded-lg border border-slate-300 p-2.5 text-sm outline-none focus:border-indigo-500"
+              className="w-full resize-none rounded-lg border border-slate-300 p-2.5 text-sm outline-none focus:border-blue-500"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) addRemark();
               }}

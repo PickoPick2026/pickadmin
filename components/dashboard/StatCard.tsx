@@ -11,16 +11,16 @@ type Props = {
 }
 
 const tones = {
-  indigo: "bg-indigo-50 text-indigo-600",
-  emerald: "bg-emerald-50 text-emerald-600",
-  amber: "bg-amber-50 text-amber-600",
-  rose: "bg-rose-50 text-rose-600",
-  slate: "bg-slate-100 text-slate-600",
+  indigo: "bg-blue-50 text-blue-600",
+  emerald: "bg-blue-50 text-blue-600",
+  amber: "bg-blue-50 text-blue-600",
+  rose: "bg-blue-50 text-blue-600",
+  slate: "bg-blue-50 text-blue-600",
 }
 
 export default function StatCard({ title, value, hint, icon: Icon, tone = "slate" }: Props) {
   return (
-    <div className="rounded-xl border bg-white p-4 shadow-sm">
+    <div className="rounded-xl border bg-white p-4">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{title}</p>

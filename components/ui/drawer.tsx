@@ -52,7 +52,7 @@ export default function Drawer({
 
       {/* Panel */}
       <aside
-        className={`absolute right-0 top-0 flex h-full w-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out ${
+        className={`absolute right-0 top-0 flex h-full w-full flex-col bg-white transition-transform duration-300 ease-out ${
           wide ? "sm:max-w-2xl" : "sm:max-w-xl"
         } ${open ? "translate-x-0" : "translate-x-full"}`}
         role="dialog"

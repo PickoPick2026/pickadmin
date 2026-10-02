@@ -31,6 +31,8 @@ import {
   buildWhatsAppLink,
   resolveAssignedTo,
 } from "@/components/crm/crmHelpers";
+import Drawer from "@/components/ui/drawer";
+import WhatsAppIcon from "@/components/common/WhatsAppIcon";
 
 type EstimateLead = {
   id: string;
@@ -64,7 +66,7 @@ const STATUSES: EstimateLead["status"][] = [
 const statusTone: Record<EstimateLead["status"], string> = {
   NEW: "bg-rose-50 text-rose-700 ring-rose-200",
   CONTACTED: "bg-amber-50 text-amber-700 ring-amber-200",
-  QUOTED: "bg-indigo-50 text-indigo-700 ring-indigo-200",
+  QUOTED: "bg-blue-50 text-blue-700 ring-blue-200",
   CONVERTED: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   CLOSED: "bg-slate-100 text-slate-600 ring-slate-200",
 };
@@ -154,7 +156,7 @@ export default function EstimateLeadsPage() {
         label: "All leads",
         value: leads.length,
         icon: Calculator,
-        tone: "bg-slate-900 text-white",
+        tone: "bg-blue-600 text-white",
       },
       {
         label: "New / unactioned",
@@ -166,7 +168,7 @@ export default function EstimateLeadsPage() {
         label: "Quoted",
         value: leads.filter((l) => l.status === "QUOTED").length,
         icon: IndianRupee,
-        tone: "bg-indigo-50 text-indigo-700",
+        tone: "bg-blue-50 text-blue-700",
       },
       {
         label: "Converted",
@@ -338,7 +340,7 @@ export default function EstimateLeadsPage() {
           return (
             <div
               key={card.label}
-              className="rounded-xl border bg-white p-4 shadow-sm"
+              className="rounded-xl border bg-white p-4"
             >
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium text-slate-500">
@@ -375,7 +377,7 @@ export default function EstimateLeadsPage() {
             onClick={() => setStatusFilter("all")}
             className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
               statusFilter === "all"
-                ? "bg-slate-900 text-white border-slate-900"
+                ? "bg-blue-600 text-white border-blue-600"
                 : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
             }`}
           >
@@ -387,7 +389,7 @@ export default function EstimateLeadsPage() {
               onClick={() => setStatusFilter(s)}
               className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
                 statusFilter === s
-                  ? "bg-slate-900 text-white border-slate-900"
+                  ? "bg-blue-600 text-white border-blue-600"
                   : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
               }`}
             >
@@ -397,7 +399,7 @@ export default function EstimateLeadsPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border bg-white">
         <table className="w-full min-w-[960px] text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
@@ -417,7 +419,7 @@ export default function EstimateLeadsPage() {
                 <td className="p-6 text-center text-slate-500" colSpan={8}>
                   <RefreshCw
                     size={18}
-                    className="mr-2 inline animate-spin text-indigo-600"
+                    className="mr-2 inline animate-spin text-blue-600"
                   />{" "}
                   Loading estimate leads…
                 </td>
@@ -446,9 +448,9 @@ export default function EstimateLeadsPage() {
                     className="border-t align-middle hover:bg-slate-50/50"
                   >
                     <td className="p-3">
-                      <p className="font-mono text-xs font-semibold text-orange-600">
+                      <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 font-mono text-[11px] font-bold text-blue-700">
                         {lead.request_code}
-                      </p>
+                      </span>
                     </td>
                     <td className="p-3">
                       <p className="font-semibold text-slate-900">
@@ -503,7 +505,7 @@ export default function EstimateLeadsPage() {
                             assignLead(lead, e.target.value || null)
                           }
                           disabled={assigning}
-                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800 outline-none hover:border-slate-300 focus:border-indigo-500"
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800 outline-none hover:border-slate-300 focus:border-blue-500"
                         >
                           <option value="">Unassigned</option>
                           {users.map((u) => (
@@ -515,7 +517,7 @@ export default function EstimateLeadsPage() {
                         {lead.assigned_to && (
                           <span
                             title={`Owner: ${userNameById(users, lead.assigned_to) || "user"}`}
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold uppercase text-white"
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold uppercase text-white"
                           >
                             {(userNameById(users, lead.assigned_to) || "U")[0]}
                           </span>
@@ -537,9 +539,9 @@ export default function EstimateLeadsPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Chat on WhatsApp"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100"
                           >
-                            <MessageCircle size={14} />
+                            <WhatsAppIcon size={14} />
                           </a>
                         )}
                         {gmailLink && (
@@ -556,7 +558,7 @@ export default function EstimateLeadsPage() {
                         <button
                           onClick={() => openLead(lead)}
                           title="View full details"
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-indigo-700 hover:bg-indigo-50"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-blue-700 hover:bg-blue-50"
                         >
                           <Eye size={15} />
                         </button>
@@ -578,49 +580,27 @@ export default function EstimateLeadsPage() {
       </div>
 
       {selected && (
-        <div
-          className="fixed inset-0 z-50 flex items-end bg-slate-900/40 p-0 sm:items-center sm:justify-center sm:p-4"
-          onClick={() => setSelected(null)}
-        >
-          <div
-            className="max-h-[88vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:max-w-2xl sm:rounded-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="font-mono text-xs font-bold text-orange-600">
-                  {selected.request_code}
-                </p>
-                <h2 className="mt-1 text-xl font-bold">
-                  {selected.customer_name}
-                </h2>
-              </div>
-              <div className="flex items-center gap-2">
-                {canDelete && (
-                  <DeleteLeadButton onDelete={() => deleteLead(selected)} />
-                )}
-                <button
-                  onClick={() => setSelected(null)}
-                  className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-              <span className="font-bold text-slate-800">
-                Verification code:
-              </span>{" "}
-              <span className="font-mono font-bold text-orange-600">
+        <Drawer
+          open
+          onClose={() => setSelected(null)}
+          title={selected.customer_name}
+          subtitle={`Received ${new Date(selected.created_at).toLocaleString()}`}
+          wide
+          actions={
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 font-mono text-[11px] font-bold text-blue-700">
                 {selected.request_code}
               </span>
-              <span className="mx-2 text-slate-300">•</span>
-              <span className="font-bold text-slate-800">Status:</span>{" "}
-              {selected.status}
-              <span className="mx-2 text-slate-300">•</span>
-              Received {new Date(selected.created_at).toLocaleString()}
+              {canDelete && (
+                <DeleteLeadButton onDelete={() => deleteLead(selected)} />
+              )}
             </div>
+          }
+        >
+          <div className="rounded-xl bg-blue-50 p-3 text-xs text-slate-600 ring-1 ring-blue-100">
+            <span className="font-bold text-slate-800">Status:</span>{" "}
+            {selected.status}
+          </div>
 
             <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
               <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -700,7 +680,7 @@ export default function EstimateLeadsPage() {
                 <button
                   onClick={saveDetails}
                   disabled={savingDetails}
-                  className="rounded-lg bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                  className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
                 >
                   {savingDetails ? "Saving…" : "Save notes & quote"}
                 </button>
@@ -711,12 +691,11 @@ export default function EstimateLeadsPage() {
               <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-slate-800">
                 View raw submitted JSON
               </summary>
-              <pre className="max-h-80 overflow-auto border-t bg-slate-950 p-4 text-xs leading-5 text-slate-100">
+              <pre className="max-h-80 overflow-auto border-t border-blue-100 bg-blue-50 p-4 text-xs leading-5 text-blue-900">
                 {JSON.stringify(selected.payload, null, 2)}
               </pre>
             </details>
-          </div>
-        </div>
+        </Drawer>
       )}
 
       <LeadActionsDrawer

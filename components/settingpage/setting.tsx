@@ -69,7 +69,7 @@ export default function AdminSettingsPage() {
       </div>
 
       {visibleSections.map((section) => (
-        <div key={section.title} className="rounded-xl border bg-white p-6 shadow-sm">
+        <div key={section.title} className="rounded-xl border bg-white p-6">
           <h2 className="text-base font-semibold text-slate-800">{section.title}</h2>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -79,9 +79,9 @@ export default function AdminSettingsPage() {
                 <Link
                   key={item.label}
                   href={item.href}
-                  className="group flex items-start gap-3 rounded-xl border border-slate-200 p-4 transition hover:border-indigo-300 hover:bg-indigo-50/40"
+                  className="group flex items-start gap-3 rounded-xl border border-slate-200 p-4 transition hover:border-blue-300 hover:bg-blue-50/40"
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 transition group-hover:bg-blue-600 group-hover:text-white">
                     <Icon size={18} />
                   </span>
                   <span>

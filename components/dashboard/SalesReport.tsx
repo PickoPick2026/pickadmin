@@ -2,7 +2,7 @@
 
 export default function SalesReport() {
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border">
+    <div className="bg-white rounded-xl p-6 border">
       <h3 className="font-semibold mb-4">Sales Report</h3>
 
       <div className="grid grid-cols-3 text-center mb-4">

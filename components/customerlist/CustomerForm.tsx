@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import Drawer from "@/components/ui/drawer"
 import { Customer } from "./CustomerPage"
 import { Eye, EyeOff, Trash2 } from "lucide-react"
 
@@ -108,14 +109,29 @@ export default function CustomerForm({
     }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50">
-      <div className="bg-white rounded-2xl shadow-lg w-full max-w-3xl p-6 space-y-6">
-
-        {/* Title */}
-        <h2 className="text-xl font-semibold">
-          {initialData ? "Edit Customer" : "Add Customer"}
-        </h2>
-
+    <Drawer
+      open
+      onClose={onClose}
+      title={initialData ? "Edit customer" : "Add customer"}
+      subtitle={initialData ? initialData.pickID : undefined}
+      wide
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              if (!validate()) return
+              onSave(form)
+            }}
+          >
+            Save Customer
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-6">
         {/* Customer Info */}
         <div className="grid grid-cols-2 gap-4">
           <Input name="firstName" placeholder="First Name" value={form.firstName} onChange={handleChange} className={errors.firstName ? "border-red-500 focus:ring-red-500" : ""} />
@@ -218,20 +234,7 @@ export default function CustomerForm({
             + Add Address
           </Button>
         </div>
-
-        {/* Actions */}
-        <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={() => {
-                if (!validate()) return
-                onSave(form)
-            }}>
-            Save Customer
-          </Button>
-        </div>
       </div>
-    </div>
+    </Drawer>
   )
 }
