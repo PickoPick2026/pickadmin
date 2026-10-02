@@ -11,7 +11,7 @@ export type Session = {
   /** Feature keys granted to this user via the Admin Users form. */
   permissions: string[]
   loggedIn: boolean
-  
+  avatar_url?: string | null
 }
 
 export function getSession(): Session | null {

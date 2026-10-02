@@ -32,8 +32,12 @@ import { useAuth } from "@/hooks/useAuth"
 import { canDeleteLeads } from "@/config/rolePermissions"
 import { buildGmailLink, buildWhatsAppLink } from "@/components/crm/crmHelpers"
 import Drawer from "@/components/ui/drawer"
+import Dropdown from "@/components/ui/dropdown"
 import WhatsAppIcon from "@/components/common/WhatsAppIcon"
-import { useAssignableUsers, userNameById } from "@/components/crm/useAssignableUsers"
+import {
+  useAssignableUsers,
+  userOptions,
+} from "@/components/crm/useAssignableUsers"
 
 export type ServiceRequest = {
   id: string
@@ -467,21 +471,20 @@ export default function ServiceRequestsPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto min-w-[170px]">
             <Filter size={15} className="text-slate-400 shrink-0 hidden sm:block" />
-            <select
-              aria-label="Filter by status"
+            <Dropdown
+              size="sm"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full sm:w-auto rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 cursor-pointer"
-            >
-              <option value="all">All Statuses</option>
-              {STATUS_LIST.map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_META[s]?.label || s}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setStatusFilter(v)}
+              options={[
+                { value: "all", label: "All Statuses" },
+                ...STATUS_LIST.map((s) => ({
+                  value: s,
+                  label: STATUS_META[s]?.label || s,
+                })),
+              ]}
+            />
           </div>
         </div>
       </div>
@@ -585,10 +588,6 @@ export default function ServiceRequestsPage() {
                       icon: Package,
                     }
                   const TypeIcon = typeMeta.icon
-                  const statusInfo = STATUS_META[req.status] || {
-                    label: req.status,
-                    badge: "bg-slate-100 text-slate-700",
-                  }
 
                   const waLink = buildWhatsAppLink(
                     req.phone,
@@ -649,19 +648,16 @@ export default function ServiceRequestsPage() {
                       </td>
 
                       {/* Status Selector */}
-                      <td className="p-3.5">
-                        <select
-                          aria-label="Change status"
+                      <td className="p-3.5 min-w-[160px]">
+                        <Dropdown
+                          size="sm"
                           value={req.status}
-                          onChange={(e) => handleUpdateStatus(req.id, e.target.value)}
-                          className={`rounded-lg border px-2.5 py-1 text-xs font-bold cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${statusInfo.badge}`}
-                        >
-                          {STATUS_LIST.map((s) => (
-                            <option key={s} value={s}>
-                              {STATUS_META[s]?.label || s}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(v) => handleUpdateStatus(req.id, v)}
+                          options={STATUS_LIST.map((s) => ({
+                            value: s,
+                            label: STATUS_META[s]?.label || s,
+                          }))}
+                        />
                       </td>
 
                       {/* Date */}
@@ -769,37 +765,26 @@ export default function ServiceRequestsPage() {
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Status
                 </label>
-                <select
-                  aria-label="Update status"
+                <Dropdown
                   value={selectedReq.status}
-                  onChange={(e) => handleUpdateStatus(selectedReq.id, e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer"
-                >
-                  {STATUS_LIST.map((s) => (
-                    <option key={s} value={s}>
-                      {STATUS_META[s]?.label || s}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => handleUpdateStatus(selectedReq.id, v)}
+                  options={STATUS_LIST.map((s) => ({
+                    value: s,
+                    label: STATUS_META[s]?.label || s,
+                  }))}
+                />
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Assigned To
                 </label>
-                <select
-                  aria-label="Assign ticket"
+                <Dropdown
                   value={selectedReq.assigned_to ?? ""}
-                  onChange={(e) => handleAssign(selectedReq.id, e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer"
-                >
-                  <option value="">Unassigned</option>
-                  {assignableUsers.map((u) => (
-                    <option key={u.adminLoginID} value={u.adminLoginID}>
-                      {u.username} — {u.role}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => handleAssign(selectedReq.id, v)}
+                  options={userOptions(assignableUsers)}
+                  placeholder="Unassigned"
+                />
               </div>
             </div>
 

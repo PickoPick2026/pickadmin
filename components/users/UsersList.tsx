@@ -1,11 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Pencil, Power } from "lucide-react"
+import { Pencil } from "lucide-react"
 import { User } from "./UsersPage"
 import TablePagination from "@/components/common/TablePagination"
 import { ITEMS_PER_PAGE } from "@/lib/tableperpage"
 import { EmptyRow, IconButton, StatusPill, TableCard, Thead, Tr } from "@/components/common/table"
+import { UserAvatar } from "@/components/ui/dropdown"
 import { assignableFeatures, menuItems } from "@/config/menuItems"
 
 const roleTone: Record<string, "blue" | "amber" | "slate"> = {
@@ -29,11 +30,9 @@ const featureLabel = (key: string) =>
 export default function UsersList({
   users,
   onEdit,
-  onToggleStatus,
 }: {
   users: User[]
   onEdit: (user: User) => void
-  onToggleStatus: (user: User) => void
 }) {
   const [currentPage, setCurrentPage] = useState(1)
 
@@ -69,9 +68,7 @@ export default function UsersList({
                 <Tr key={user.adminLoginID}>
                   <td className="p-3">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs font-bold uppercase text-white">
-                        {user.username?.[0] ?? "?"}
-                      </span>
+                      <UserAvatar name={user.username} image={user.avatar_url} size={36} />
                       <span className="font-medium text-slate-800">{user.username}</span>
                     </div>
                   </td>
@@ -113,15 +110,8 @@ export default function UsersList({
                   </td>
                   <td className="p-3">
                     <div className="flex items-center justify-end gap-1">
-                      <IconButton onClick={() => onEdit(user)} title="Edit user" tone="blue">
+                      <IconButton onClick={() => onEdit(user)} title="Edit user (activate/deactivate inside)" tone="blue">
                         <Pencil size={15} />
-                      </IconButton>
-                      <IconButton
-                        onClick={() => onToggleStatus(user)}
-                        title={user.adminLoginStatus ? "Deactivate user" : "Activate user"}
-                        tone={user.adminLoginStatus ? "red" : "slate"}
-                      >
-                        <Power size={15} />
                       </IconButton>
                     </div>
                   </td>

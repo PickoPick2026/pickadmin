@@ -9,6 +9,7 @@ import * as XLSX from "xlsx"
 import { saveAs } from "file-saver"
 import { FileDown, FileSpreadsheet } from "lucide-react"
 import CustomerList from "./CustomerList"
+import CustomerDrawer from "./CustomerDrawer"
 import CustomerForm from "./CustomerForm"
 import PageHeader from "@/components/common/PageHeader"
 import bcrypt from "bcryptjs"
@@ -41,6 +42,7 @@ export default function CustomerPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
+  const [viewing, setViewing] = useState<Customer | null>(null)
   const [search, setSearch] = useState("")
 
   useEffect(() => {
@@ -241,6 +243,7 @@ export default function CustomerPage() {
       .update({ customerStatus: false })
       .eq("customerID", id)
 
+    setViewing(null)
     fetchCustomers()
   }
 
@@ -311,12 +314,19 @@ export default function CustomerPage() {
 
       <CustomerList
         customers={filteredCustomers}
+        onView={(c) => setViewing(c)}
+      />
+
+      <CustomerDrawer
+        customer={viewing}
+        onClose={() => setViewing(null)}
         onEdit={(c) => {
-            setEditing(c)
-            setOpen(true)
+          setViewing(null)
+          setEditing(c)
+          setOpen(true)
         }}
-        onDelete={handleDelete}
-        />
+        onDeactivate={handleDelete}
+      />
 
       {open && (
         <CustomerForm

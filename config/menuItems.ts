@@ -39,7 +39,7 @@ export const menuItems = [
   },
   {
     key: "kanban",
-    label: "Kanban Board",
+    label: "Pipeline",
     href: "/kanban",
     icon: SquareKanban,
   },

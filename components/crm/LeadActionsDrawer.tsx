@@ -8,8 +8,13 @@ import {
   UserPlus,
 } from "lucide-react";
 import Drawer from "@/components/ui/drawer";
+import Dropdown from "@/components/ui/dropdown";
 import WhatsAppIcon from "@/components/common/WhatsAppIcon";
-import { AdminUser, userNameById } from "@/components/crm/useAssignableUsers";
+import {
+  AdminUser,
+  userNameById,
+  userOptions,
+} from "@/components/crm/useAssignableUsers";
 import {
   Remark,
   buildGmailLink,
@@ -154,19 +159,14 @@ export default function LeadActionsDrawer({
             Assigned owner
           </span>
           <div className="mt-1 flex items-center gap-2">
-            <select
+            <Dropdown
               value={assignedTo ?? ""}
-              onChange={(e) => onAssign(e.target.value || null)}
+              onChange={(v) => onAssign(v || null)}
+              options={userOptions(users)}
+              placeholder="Unassigned"
+              emptyLabel="No team members"
               disabled={assigning}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-500 disabled:opacity-60"
-            >
-              <option value="">Unassigned</option>
-              {users.map((u) => (
-                <option key={u.adminLoginID} value={u.adminLoginID}>
-                  {u.username} {u.role === "SUPER_ADMIN" ? "(super admin)" : ""}
-                </option>
-              ))}
-            </select>
+            />
             <UserPlus size={16} className="shrink-0 text-slate-400" />
           </div>
           {assignedTo && (
@@ -183,17 +183,14 @@ export default function LeadActionsDrawer({
           <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
             Status
           </span>
-          <select
-            value={status}
-            onChange={(e) => onStatusChange(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500"
-          >
-            {statuses.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          <div className="mt-1">
+            <Dropdown
+              value={status}
+              onChange={(v) => onStatusChange(v)}
+              options={statuses}
+              placeholder="Status"
+            />
+          </div>
         </label>
       </div>
 

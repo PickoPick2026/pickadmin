@@ -45,6 +45,7 @@ export default function LoginForm() {
         username: adminLogin.username,
         role: adminLogin.role,
         permissions: Array.isArray(adminLogin.permissions) ? adminLogin.permissions : [],
+        avatar_url: adminLogin.avatar_url ?? null,
         loggedIn: true,
       }))
       toast.success("Login successful")

@@ -1,10 +1,7 @@
 "use client"
 
-import Image from "next/image"
 import { Menu } from "lucide-react"
 import { useEffect, useState } from "react"
-import { format } from "date-fns"
-import Clock from '@/components/Clock';
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -26,53 +23,35 @@ type TopbarProps = {
 
 export default function Topbar({ onToggle }: TopbarProps) {
   const router = useRouter()
-  const { session, role, loading } = useAuth()
+  const { session, loading } = useAuth()
 
-  const [now, setNow] = useState(new Date())
-  const [isOnline, setIsOnline] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
 
-  // Live clock
+  // Live avatar: stored in the session at login, refreshed from the DB so an
+  // updated photo shows up without signing in again.
   useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(new Date())
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [])
+    if (!session?.id) return
+    setAvatarUrl(session.avatar_url ?? null)
+    supabase
+      .from("adminLoginTable")
+      .select("avatar_url")
+      .eq("adminLoginID", session.id)
+      .limit(1)
+      .then(({ data }) => {
+        if (data && data.length > 0) setAvatarUrl(data[0].avatar_url ?? null)
+      })
+  }, [session?.id, session?.avatar_url])
 
   // Mounted
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // ✅ Online status effect (MOVED ABOVE RETURN)
-  // useEffect(() => {
-  //   const checkOnlineStatus = async () => {
-  //     const session = localStorage.getItem("session")
-  //     if (!session) return
-
-  //     const parsed = JSON.parse(session)
-
-  //     const { data } = await supabase
-  //       .from("userSessionTable")
-  //       .select("sessionStatus")
-  //       .eq("userID", parsed.userID)
-  //       .order("login_time", { ascending: false })
-  //       .limit(1)
-
-  //     if (data && data.length > 0) {
-  //       setIsOnline(data[0].sessionStatus === "ONLINE")
-  //     }
-  //   }
-
-  //   checkOnlineStatus()
-  // }, [])
-
   // ✅ Now safe
   if (!mounted) return null
 
-  
+
 
   return (
    <header className="h-16 border-b bg-background px-4 flex items-center justify-between">
@@ -96,11 +75,6 @@ export default function Topbar({ onToggle }: TopbarProps) {
 
   {/* Right */}
   <div className="flex items-center gap-6">
-    {/* Clock */}
-    <div className="hidden md:flex text-sm text-muted-foreground">
-      <Clock />
-    </div>
-
     {/* User dropdown */}
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -108,13 +82,20 @@ export default function Topbar({ onToggle }: TopbarProps) {
           type="button"
           className="flex items-center gap-3 rounded-md px-2 py-1 hover:bg-muted"
         >
-          <Image
-            src="/images/user.png"
-            alt="User"
-            width={32}
-            height={32}
-            className="rounded-full"
-          />
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl}
+              alt="User"
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded-full border border-slate-200 object-cover"
+            />
+          ) : (
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold uppercase text-white">
+              {(loading ? "" : session?.username ?? "?")[0] ?? "?"}
+            </span>
+          )}
 
           <div className="hidden md:block text-left">
             <p className="text-sm font-semibold leading-none">
@@ -124,7 +105,7 @@ export default function Topbar({ onToggle }: TopbarProps) {
               {loading ? "Loading..." : session?.role ?? "—"}
             </span>
           </div>
-          
+
         </button>
       </DropdownMenuTrigger>
 

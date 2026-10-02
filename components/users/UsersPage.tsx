@@ -16,6 +16,7 @@ export type User = {
   role: "SUPER_ADMIN" | "ADMIN" | "STAFF"
   adminLoginStatus: boolean
   permissions: string[]
+  avatar_url?: string | null
 }
 
 export default function UsersPage() {
@@ -66,6 +67,7 @@ export default function UsersPage() {
         permissions: user.permissions,
       }
       if (hashedPassword) payload.password = hashedPassword
+      if (user.avatar_url !== undefined) payload.avatar_url = user.avatar_url
 
       if (editing) {
         const { error } = await supabase
@@ -108,21 +110,6 @@ export default function UsersPage() {
     setOpen(true)
   }
 
-  const handleToggleStatus = async (user: User) => {
-    const next = !user.adminLoginStatus
-    const { error } = await supabase
-      .from("adminLoginTable")
-      .update({ adminLoginStatus: next })
-      .eq("adminLoginID", user.adminLoginID)
-
-    if (error) return toast.error(`Could not update user: ${error.message}`)
-
-    setUsers((prev) =>
-      prev.map((u) => (u.adminLoginID === user.adminLoginID ? { ...u, adminLoginStatus: next } : u))
-    )
-    toast.success(next ? "User activated" : "User deactivated")
-  }
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -148,11 +135,7 @@ export default function UsersPage() {
         />
       )}
 
-      <UsersList
-        users={filteredUsers}
-        onEdit={handleEdit}
-        onToggleStatus={handleToggleStatus}
-      />
+      <UsersList users={filteredUsers} onEdit={handleEdit} />
     </div>
   )
 }

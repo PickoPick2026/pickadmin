@@ -24,8 +24,9 @@ import LeadActionsDrawer, { Remark } from "@/components/crm/LeadActionsDrawer";
 import DeleteLeadButton from "@/components/crm/DeleteLeadButton";
 import {
   useAssignableUsers,
-  userNameById,
+  userOptions,
 } from "@/components/crm/useAssignableUsers";
+import Dropdown from "@/components/ui/dropdown";
 import {
   assignLeadOwner,
   buildGmailLink,
@@ -607,51 +608,29 @@ export default function QuotesPage() {
                     </td>
 
                     {/* Status with inline selector */}
-                    <td className="p-3.5 align-middle">
-                      <select
+                    <td className="p-3.5 align-middle min-w-[170px]">
+                      <Dropdown
+                        size="sm"
                         value={quote.status}
-                        onChange={(e) =>
-                          changeStatusQuick(quote, e.target.value)
-                        }
-                        className={`rounded-lg border px-2.5 py-1 text-xs font-bold outline-none ring-1 transition cursor-pointer ${
-                          statusTone[quote.status] ||
-                          "bg-slate-100 text-slate-800 ring-slate-200 border-slate-300"
-                        }`}
-                      >
-                        {STATUSES.map((st) => (
-                          <option key={st} value={st}>
-                            {statusLabels[st] || st}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(v) => changeStatusQuick(quote, v)}
+                        options={STATUSES.map((st) => ({
+                          value: st,
+                          label: statusLabels[st] || st,
+                        }))}
+                      />
                     </td>
 
                     {/* Owner */}
-                    <td className="p-3.5 align-middle">
+                    <td className="p-3.5 align-middle min-w-[150px]">
                       <div className="flex items-center gap-1.5">
-                        <select
+                        <Dropdown
+                          size="sm"
                           value={quote.assigned_to ?? ""}
-                          onChange={(e) =>
-                            assignQuote(quote, e.target.value || null)
-                          }
+                          onChange={(v) => assignQuote(quote, v || null)}
+                          options={userOptions(users)}
+                          placeholder="Unassigned"
                           disabled={assigning}
-                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800 outline-none hover:border-slate-300 focus:border-blue-500"
-                        >
-                          <option value="">Unassigned</option>
-                          {users.map((u) => (
-                            <option key={u.adminLoginID} value={u.adminLoginID}>
-                              {u.username}
-                            </option>
-                          ))}
-                        </select>
-                        {quote.assigned_to && (
-                          <span
-                            title={`Owner: ${userNameById(users, quote.assigned_to) || "user"}`}
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold uppercase text-white"
-                          >
-                            {(userNameById(users, quote.assigned_to) || "U")[0]}
-                          </span>
-                        )}
+                        />
                       </div>
                       {(quote.remarks?.length ?? 0) > 0 && (
                         <p className="mt-1 text-[11px] text-slate-400">
@@ -976,17 +955,17 @@ export default function QuotesPage() {
                   <label className="text-xs font-semibold text-slate-600">
                     Quote Status:
                   </label>
-                  <select
-                    value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value)}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold outline-none focus:border-blue-600"
-                  >
-                    {STATUSES.map((st) => (
-                      <option key={st} value={st}>
-                        {statusLabels[st] || st}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="min-w-[160px]">
+                    <Dropdown
+                      size="sm"
+                      value={editStatus}
+                      onChange={(v) => setEditStatus(v)}
+                      options={STATUSES.map((st) => ({
+                        value: st,
+                        label: statusLabels[st] || st,
+                      }))}
+                    />
+                  </div>
                 </div>
 
                 <button

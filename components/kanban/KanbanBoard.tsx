@@ -17,7 +17,8 @@ import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import { getSession } from "@/lib/auth"
 import LeadActionsDrawer from "@/components/crm/LeadActionsDrawer"
-import { useAssignableUsers, userNameById } from "@/components/crm/useAssignableUsers"
+import { useAssignableUsers } from "@/components/crm/useAssignableUsers"
+import { UserAvatar } from "@/components/ui/dropdown"
 import {
   Remark,
   assignLeadOwner,
@@ -185,7 +186,17 @@ const MODULES: ModuleConfig[] = [
   },
 ]
 
-function KanbanCard({ card, ownerName, dragging }: { card: Card; ownerName: string | null; dragging?: boolean }) {
+function KanbanCard({
+  card,
+  ownerName,
+  ownerAvatar,
+  dragging,
+}: {
+  card: Card
+  ownerName: string | null
+  ownerAvatar?: string | null
+  dragging?: boolean
+}) {
   return (
     <div
       className={`rounded-xl border border-slate-200 bg-white p-3 transition ${
@@ -213,9 +224,7 @@ function KanbanCard({ card, ownerName, dragging }: { card: Card; ownerName: stri
               title={`Owner: ${ownerName}`}
               className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 ring-1 ring-blue-200"
             >
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[8px] font-bold uppercase text-white">
-                {ownerName[0]}
-              </span>
+              <UserAvatar name={ownerName} image={ownerAvatar} size={16} />
               <span className="max-w-[70px] truncate text-[10px] font-semibold text-blue-700">{ownerName}</span>
             </span>
           ) : (
@@ -232,10 +241,12 @@ function KanbanCard({ card, ownerName, dragging }: { card: Card; ownerName: stri
 function DraggableCard({
   card,
   ownerName,
+  ownerAvatar,
   onOpen,
 }: {
   card: Card
   ownerName: string | null
+  ownerAvatar?: string | null
   onOpen: (card: Card) => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: card.id })
@@ -247,7 +258,7 @@ function DraggableCard({
       onClick={() => onOpen(card)}
       className={`touch-none cursor-pointer ${isDragging ? "opacity-40" : ""}`}
     >
-      <KanbanCard card={card} ownerName={ownerName} />
+      <KanbanCard card={card} ownerName={ownerName} ownerAvatar={ownerAvatar} />
     </div>
   )
 }
@@ -256,23 +267,31 @@ function Column({
   status,
   cards,
   owners,
+  ownerAvatars,
   onOpen,
 }: {
   status: { value: string; label: string; dot: string }
   cards: Card[]
   owners: Record<string, string | null>
+  ownerAvatars: Record<string, string | null>
   onOpen: (card: Card) => void
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: status.value })
 
   return (
     <div className="flex min-w-[250px] flex-1 flex-col max-h-full">
-      <div className="mb-2 flex shrink-0 items-center justify-between px-1">
-        <div className="flex items-center gap-2">
-          <span className={`h-2 w-2 rounded-full ${dotClasses[status.dot]}`} />
-          <span className="text-xs font-bold uppercase tracking-wide text-slate-600">{status.label}</span>
+      <div
+        className={`mb-2 flex shrink-0 items-center justify-between gap-2 rounded-xl border bg-white px-3 py-2 transition-colors ${
+          isOver ? "border-blue-400" : "border-slate-200"
+        }`}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`h-2 w-2 shrink-0 rounded-full ${dotClasses[status.dot]}`} />
+          <span className="truncate text-xs font-bold uppercase tracking-wide text-slate-700">
+            {status.label}
+          </span>
         </div>
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">
+        <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 ring-1 ring-blue-200">
           {cards.length}
         </span>
       </div>
@@ -286,6 +305,7 @@ function Column({
             key={card.id}
             card={card}
             ownerName={card.assigned_to ? owners[card.assigned_to] ?? null : null}
+            ownerAvatar={card.assigned_to ? ownerAvatars[card.assigned_to] ?? null : null}
             onOpen={onOpen}
           />
         ))}
@@ -319,10 +339,16 @@ export default function KanbanBoard() {
 
   const module = useMemo(() => MODULES.find((m) => m.key === moduleKey)!, [moduleKey])
 
-  // adminLoginID (string) -> username, for the owner chips on cards
+  // adminLoginID (string) -> username / avatar, for the owner chips on cards
   const owners = useMemo(() => {
     const map: Record<string, string | null> = {}
     users.forEach((u) => (map[u.adminLoginID] = u.username))
+    return map
+  }, [users])
+
+  const ownerAvatars = useMemo(() => {
+    const map: Record<string, string | null> = {}
+    users.forEach((u) => (map[u.adminLoginID] = u.avatar_url))
     return map
   }, [users])
 
@@ -498,7 +524,7 @@ export default function KanbanBoard() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Kanban Board</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Pipeline</h1>
           <p className="mt-1 text-sm text-slate-500">
             Drag cards between columns to update the status — or click a card to open its details, owner and remarks.
           </p>
@@ -512,18 +538,19 @@ export default function KanbanBoard() {
         </button>
       </div>
 
-      {/* Module tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      {/* Module tabs — white bar, blue active pill */}
+      <div className="flex gap-1.5 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1.5">
         {MODULES.map((m) => {
           const Icon = m.icon
+          const active = moduleKey === m.key
           return (
             <button
               key={m.key}
               onClick={() => setModuleKey(m.key)}
-              className={`inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition ${
-                moduleKey === m.key
-                  ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+              className={`inline-flex flex-1 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-xs font-bold transition ${
+                active
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
               }`}
             >
               <Icon size={14} />
@@ -547,6 +574,7 @@ export default function KanbanBoard() {
                 status={status}
                 cards={cards.filter((c) => c.status === status.value)}
                 owners={owners}
+                ownerAvatars={ownerAvatars}
                 onOpen={openDetail}
               />
             ))}
@@ -558,6 +586,7 @@ export default function KanbanBoard() {
                 <KanbanCard
                   card={activeCard}
                   ownerName={activeCard.assigned_to ? owners[activeCard.assigned_to] ?? null : null}
+                  ownerAvatar={activeCard.assigned_to ? ownerAvatars[activeCard.assigned_to] ?? null : null}
                   dragging
                 />
               </div>

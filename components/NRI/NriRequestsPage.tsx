@@ -22,8 +22,9 @@ import LeadActionsDrawer, { Remark } from "@/components/crm/LeadActionsDrawer";
 import DeleteLeadButton from "@/components/crm/DeleteLeadButton";
 import {
   useAssignableUsers,
-  userNameById,
+  userOptions,
 } from "@/components/crm/useAssignableUsers";
+import Dropdown from "@/components/ui/dropdown";
 import {
   assignLeadOwner,
   buildGmailLink,
@@ -620,48 +621,23 @@ export default function NriRequestsPage() {
                         {request.preferred_time || "Flexible"}
                       </p>
                     </td>
-                    <td className="p-3">
-                      <select
+                    <td className="p-3 min-w-[140px]">
+                      <Dropdown
+                        size="sm"
                         value={request.status}
-                        onChange={(e) => changeStatus(request, e.target.value)}
-                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold cursor-pointer outline-none hover:border-slate-300"
-                      >
-                        {statuses.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(v) => changeStatus(request, v)}
+                        options={statuses.map((s) => ({ value: s, label: s }))}
+                      />
                     </td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-1.5">
-                        <select
-                          value={request.assigned_to ?? ""}
-                          onChange={(e) =>
-                            assignRequest(request, e.target.value || null)
-                          }
-                          disabled={assigning}
-                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800 outline-none hover:border-slate-300 focus:border-blue-500"
-                        >
-                          <option value="">Unassigned</option>
-                          {users.map((u) => (
-                            <option key={u.adminLoginID} value={u.adminLoginID}>
-                              {u.username}
-                            </option>
-                          ))}
-                        </select>
-                        {request.assigned_to && (
-                          <span
-                            title={`Owner: ${userNameById(users, request.assigned_to) || "user"}`}
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold uppercase text-white"
-                          >
-                            {
-                              (userNameById(users, request.assigned_to) ||
-                                "U")[0]
-                            }
-                          </span>
-                        )}
-                      </div>
+                    <td className="p-3 min-w-[140px]">
+                      <Dropdown
+                        size="sm"
+                        value={request.assigned_to ?? ""}
+                        onChange={(v) => assignRequest(request, v || null)}
+                        options={userOptions(users)}
+                        placeholder="Unassigned"
+                        disabled={assigning}
+                      />
                     </td>
                     <td className="p-3 text-xs text-slate-500">
                       {new Date(request.created_at).toLocaleDateString(

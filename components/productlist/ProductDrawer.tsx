@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { ImagePlus, Pencil, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import Drawer from "@/components/ui/drawer"
+import Dropdown from "@/components/ui/dropdown"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { StatusPill } from "@/components/common/table"
@@ -284,33 +285,29 @@ export default function ProductDrawer({
 
           <div className="grid grid-cols-2 gap-4">
             {fields(
-              <select
-                name="categoryID"
+              <Dropdown
                 value={form.categoryID}
-                onChange={(e) => setForm({ ...form, categoryID: e.target.value })}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:border-ring"
-              >
-                <option value="">Choose category</option>
-                {categories.map((c) => (
-                  <option key={c.categoryID} value={c.categoryID}>
-                    {c.categoryName}
-                  </option>
-                ))}
-              </select>,
+                onChange={(v) => setForm({ ...form, categoryID: v })}
+                options={categories.map((c) => ({
+                  value: String(c.categoryID),
+                  label: c.categoryName,
+                }))}
+                placeholder="Choose category"
+              />,
               "Category"
             )}
             {fields(
-              <select
-                name="status"
+              <Dropdown
                 value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:border-ring"
-              >
-                <option value="Published">Published</option>
-                <option value="Pending">Pending</option>
-                <option value="Draft">Draft</option>
-                <option value="Closed">Closed</option>
-              </select>,
+                onChange={(v) => setForm({ ...form, status: v })}
+                options={[
+                  { value: "Published", label: "Published" },
+                  { value: "Pending", label: "Pending" },
+                  { value: "Draft", label: "Draft" },
+                  { value: "Closed", label: "Closed" },
+                ]}
+                placeholder="Status"
+              />,
               "Status"
             )}
           </div>

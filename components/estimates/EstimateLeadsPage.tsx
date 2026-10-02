@@ -23,8 +23,9 @@ import LeadActionsDrawer, { Remark } from "@/components/crm/LeadActionsDrawer";
 import DeleteLeadButton from "@/components/crm/DeleteLeadButton";
 import {
   useAssignableUsers,
-  userNameById,
+  userOptions,
 } from "@/components/crm/useAssignableUsers";
+import Dropdown from "@/components/ui/dropdown";
 import {
   assignLeadOwner,
   buildGmailLink,
@@ -62,14 +63,6 @@ const STATUSES: EstimateLead["status"][] = [
   "CONVERTED",
   "CLOSED",
 ];
-
-const statusTone: Record<EstimateLead["status"], string> = {
-  NEW: "bg-rose-50 text-rose-700 ring-rose-200",
-  CONTACTED: "bg-amber-50 text-amber-700 ring-amber-200",
-  QUOTED: "bg-blue-50 text-blue-700 ring-blue-200",
-  CONVERTED: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  CLOSED: "bg-slate-100 text-slate-600 ring-slate-200",
-};
 
 const text = (value: unknown, fallback = "—") =>
   value === null || value === undefined || value === ""
@@ -479,50 +472,25 @@ export default function EstimateLeadsPage() {
                         {lead.dimensions ? ` · ${lead.dimensions}` : ""}
                       </p>
                     </td>
-                    <td className="p-3">
-                      <select
+                    <td className="p-3 min-w-[120px]">
+                      <Dropdown
+                        size="sm"
                         value={lead.status}
-                        onChange={(e) =>
-                          changeStatus(
-                            lead,
-                            e.target.value as EstimateLead["status"],
-                          )
+                        onChange={(v) =>
+                          changeStatus(lead, v as EstimateLead["status"])
                         }
-                        className={`rounded-md px-2 py-1 text-xs font-semibold ring-1 cursor-pointer ${statusTone[lead.status]}`}
-                      >
-                        {STATUSES.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
+                        options={STATUSES.map((s) => ({ value: s, label: s }))}
+                      />
                     </td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-1.5">
-                        <select
-                          value={lead.assigned_to ?? ""}
-                          onChange={(e) =>
-                            assignLead(lead, e.target.value || null)
-                          }
-                          disabled={assigning}
-                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800 outline-none hover:border-slate-300 focus:border-blue-500"
-                        >
-                          <option value="">Unassigned</option>
-                          {users.map((u) => (
-                            <option key={u.adminLoginID} value={u.adminLoginID}>
-                              {u.username}
-                            </option>
-                          ))}
-                        </select>
-                        {lead.assigned_to && (
-                          <span
-                            title={`Owner: ${userNameById(users, lead.assigned_to) || "user"}`}
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold uppercase text-white"
-                          >
-                            {(userNameById(users, lead.assigned_to) || "U")[0]}
-                          </span>
-                        )}
-                      </div>
+                    <td className="p-3 min-w-[140px]">
+                      <Dropdown
+                        size="sm"
+                        value={lead.assigned_to ?? ""}
+                        onChange={(v) => assignLead(lead, v || null)}
+                        options={userOptions(users)}
+                        placeholder="Unassigned"
+                        disabled={assigning}
+                      />
                     </td>
                     <td className="p-3 text-xs text-slate-500">
                       {new Date(lead.created_at).toLocaleDateString("en-IN", {
@@ -661,22 +629,16 @@ export default function EstimateLeadsPage() {
                 </label>
               </div>
               <div className="mt-3 flex items-center gap-3">
-                <select
-                  value={selected.status}
-                  onChange={(e) =>
-                    changeStatus(
-                      selected,
-                      e.target.value as EstimateLead["status"],
-                    )
-                  }
-                  className={`rounded-md px-2 py-1.5 text-xs font-semibold ring-1 cursor-pointer ${statusTone[selected.status]}`}
-                >
-                  {STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                <div className="min-w-[130px]">
+                  <Dropdown
+                    size="sm"
+                    value={selected.status}
+                    onChange={(v) =>
+                      changeStatus(selected, v as EstimateLead["status"])
+                    }
+                    options={STATUSES.map((s) => ({ value: s, label: s }))}
+                  />
+                </div>
                 <button
                   onClick={saveDetails}
                   disabled={savingDetails}
