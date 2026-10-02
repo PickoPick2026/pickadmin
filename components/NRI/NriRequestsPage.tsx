@@ -59,6 +59,7 @@ const typeLabels: Record<NriRequest["request_type"], string> = {
 const statuses = [
   "PENDING",
   "CONTACTED",
+  "FOLLOW_UP",
   "CONFIRMED",
   "COMPLETED",
   "CANCELLED",

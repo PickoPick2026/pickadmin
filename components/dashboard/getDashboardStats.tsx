@@ -1,17 +1,20 @@
 import { supabase } from "@/lib/supabase"
 
+export type LeadStatusCounts = Record<string, number>
+
 export type DashboardData = {
   totalCustomers: number
-  todayCustomers: number
   weekCustomers: number
-  totalCategories: number
-  totalProducts: number
   outOfStock: number
   lowStock: number
-  pendingNri: number
-  newEstimates: number
+  /** status -> row count, per CRM lead source */
+  leadStatuses: {
+    estimates: LeadStatusCounts
+    quotes: LeadStatusCounts
+    nri: LeadStatusCounts
+    services: LeadStatusCounts
+  }
   signupTrend: { label: string; date: string; customers: number }[]
-  categoryBreakdown: { name: string; products: number }[]
   recentCustomers: {
     customerID: number
     name: string
@@ -19,10 +22,18 @@ export type DashboardData = {
     phoneNumber: string
     created_at: string
   }[]
-  lowStockProducts: { productID: number; productName: string; stock: number; category: string }[]
+  lowStockProducts: { productID: number; productName: string; stock: number }[]
 }
 
 const dayKey = (d: Date) => d.toISOString().split("T")[0]
+
+const countByStatus = (rows: { status: string }[] | null): LeadStatusCounts => {
+  const map: LeadStatusCounts = {}
+  ;(rows ?? []).forEach((row) => {
+    map[row.status] = (map[row.status] ?? 0) + 1
+  })
+  return map
+}
 
 export const getDashboardStats = async (): Promise<DashboardData> => {
   const now = new Date()
@@ -32,27 +43,23 @@ export const getDashboardStats = async (): Promise<DashboardData> => {
 
   const [
     totalCustomersRes,
-    todayCustomersRes,
     weekCustomersRes,
-    totalCategoriesRes,
-    totalProductsRes,
-    pendingNriRes,
-    newEstimatesRes,
     customerDatesRes,
-    categoriesRes,
     productsRes,
+    estimatesRes,
+    quotesRes,
+    nriRes,
+    servicesRes,
     recentCustomersRes,
   ] = await Promise.all([
     supabase.from("customerList").select("*", { count: "exact", head: true }).eq("customerStatus", true),
-    supabase.from("customerList").select("*", { count: "exact", head: true }).eq("customerStatus", true).gte("created_at", today),
     supabase.from("customerList").select("*", { count: "exact", head: true }).eq("customerStatus", true).gte("created_at", dayKey(weekAgo)),
-    supabase.from("category").select("*", { count: "exact", head: true }),
-    supabase.from("productTable").select("*", { count: "exact", head: true }),
-    supabase.from("nri_requests").select("*", { count: "exact", head: true }).eq("status", "PENDING"),
-    supabase.from("estimate_leads").select("*", { count: "exact", head: true }).eq("status", "NEW"),
     supabase.from("customerList").select("created_at").eq("customerStatus", true).gte("created_at", dayKey(trendStart)),
-    supabase.from("category").select("categoryID, categoryName"),
-    supabase.from("productTable").select("productID, productName, stock, categoryID"),
+    supabase.from("productTable").select("productID, productName, stock"),
+    supabase.from("estimate_leads").select("status"),
+    supabase.from("orders").select("status"),
+    supabase.from("nri_requests").select("status"),
+    supabase.from("service_requests").select("status"),
     supabase
       .from("customerList")
       .select("customerID, firstName, lastName, pickID, phoneNumber, created_at")
@@ -62,7 +69,6 @@ export const getDashboardStats = async (): Promise<DashboardData> => {
   ])
 
   const products = productsRes.data ?? []
-  const categories = categoriesRes.data ?? []
 
   // 14-day signup trend
   const buckets = new Map<string, number>()
@@ -79,14 +85,6 @@ export const getDashboardStats = async (): Promise<DashboardData> => {
     label: new Date(date).toLocaleDateString("en-US", { day: "numeric", month: "short" }),
   }))
 
-  // products per category
-  const categoryBreakdown = categories
-    .map((cat: any) => ({
-      name: cat.categoryName,
-      products: products.filter((p: any) => p.categoryID === cat.categoryID).length,
-    }))
-    .sort((a, b) => b.products - a.products)
-
   const lowStockProducts = products
     .filter((p: any) => Number(p.stock) <= 5)
     .sort((a: any, b: any) => Number(a.stock) - Number(b.stock))
@@ -95,21 +93,20 @@ export const getDashboardStats = async (): Promise<DashboardData> => {
       productID: p.productID,
       productName: p.productName,
       stock: Number(p.stock),
-      category: categories.find((c: any) => c.categoryID === p.categoryID)?.categoryName ?? "—",
     }))
 
   return {
     totalCustomers: totalCustomersRes.count ?? 0,
-    todayCustomers: todayCustomersRes.count ?? 0,
     weekCustomers: weekCustomersRes.count ?? 0,
-    totalCategories: totalCategoriesRes.count ?? 0,
-    totalProducts: totalProductsRes.count ?? 0,
     outOfStock: products.filter((p: any) => Number(p.stock) <= 0).length,
     lowStock: products.filter((p: any) => Number(p.stock) > 0 && Number(p.stock) <= 5).length,
-    pendingNri: pendingNriRes.count ?? 0,
-    newEstimates: newEstimatesRes.count ?? 0,
+    leadStatuses: {
+      estimates: countByStatus(estimatesRes.data as { status: string }[] | null),
+      quotes: countByStatus(quotesRes.data as { status: string }[] | null),
+      nri: countByStatus(nriRes.data as { status: string }[] | null),
+      services: countByStatus(servicesRes.data as { status: string }[] | null),
+    },
     signupTrend,
-    categoryBreakdown,
     recentCustomers: (recentCustomersRes.data ?? []).map((c: any) => ({
       customerID: c.customerID,
       name: `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() || "—",

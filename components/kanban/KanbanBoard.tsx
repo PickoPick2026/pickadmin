@@ -53,6 +53,7 @@ const dotClasses: Record<string, string> = {
   amber: "bg-blue-400",
   blue: "bg-blue-500",
   indigo: "bg-blue-500",
+  followup: "bg-blue-300",
   emerald: "bg-emerald-500",
   slate: "bg-slate-400",
 }
@@ -72,6 +73,7 @@ const MODULES: ModuleConfig[] = [
     statuses: [
       { value: "NEW", label: "New", dot: "rose" },
       { value: "CONTACTED", label: "Contacted", dot: "amber" },
+      { value: "FOLLOW_UP", label: "Follow-up", dot: "followup" },
       { value: "QUOTED", label: "Quoted", dot: "indigo" },
       { value: "CONVERTED", label: "Converted", dot: "emerald" },
       { value: "CLOSED", label: "Closed", dot: "slate" },
@@ -102,6 +104,7 @@ const MODULES: ModuleConfig[] = [
     statuses: [
       { value: "PENDING", label: "Pending", dot: "rose" },
       { value: "CONTACTED", label: "Contacted", dot: "amber" },
+      { value: "FOLLOW_UP", label: "Follow-up", dot: "followup" },
       { value: "CONFIRMED", label: "Confirmed", dot: "blue" },
       { value: "COMPLETED", label: "Completed", dot: "emerald" },
       { value: "CANCELLED", label: "Cancelled", dot: "slate" },
@@ -132,6 +135,7 @@ const MODULES: ModuleConfig[] = [
     statuses: [
       { value: "QUOTE_REQUESTED", label: "Quote Requested", dot: "amber" },
       { value: "CONTACTED", label: "Contacted", dot: "blue" },
+      { value: "FOLLOW_UP", label: "Follow-up", dot: "followup" },
       { value: "QUOTED", label: "Quoted", dot: "indigo" },
       { value: "COMPLETED", label: "Completed", dot: "emerald" },
       { value: "CANCELLED", label: "Cancelled", dot: "slate" },
@@ -162,6 +166,7 @@ const MODULES: ModuleConfig[] = [
     statuses: [
       { value: "NEW", label: "New", dot: "rose" },
       { value: "CONTACTED", label: "Contacted", dot: "amber" },
+      { value: "FOLLOW_UP", label: "Follow-up", dot: "followup" },
       { value: "IN_PROGRESS", label: "In Progress", dot: "blue" },
       { value: "COMPLETED", label: "Completed", dot: "emerald" },
       { value: "CLOSED", label: "Closed", dot: "slate" },

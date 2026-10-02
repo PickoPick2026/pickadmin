@@ -38,7 +38,13 @@ import WhatsAppIcon from "@/components/common/WhatsAppIcon";
 type EstimateLead = {
   id: string;
   request_code: string;
-  status: "NEW" | "CONTACTED" | "QUOTED" | "CONVERTED" | "CLOSED";
+  status:
+    | "NEW"
+    | "CONTACTED"
+    | "FOLLOW_UP"
+    | "QUOTED"
+    | "CONVERTED"
+    | "CLOSED";
   customer_name: string;
   whatsapp_number: string;
   email: string | null;
@@ -59,6 +65,7 @@ type EstimateLead = {
 const STATUSES: EstimateLead["status"][] = [
   "NEW",
   "CONTACTED",
+  "FOLLOW_UP",
   "QUOTED",
   "CONVERTED",
   "CLOSED",

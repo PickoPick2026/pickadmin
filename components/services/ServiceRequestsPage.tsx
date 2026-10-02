@@ -27,10 +27,11 @@ import {
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
+import { getSession } from "@/lib/auth"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useAuth } from "@/hooks/useAuth"
 import { canDeleteLeads } from "@/config/rolePermissions"
-import { buildGmailLink, buildWhatsAppLink } from "@/components/crm/crmHelpers"
+import { buildGmailLink, buildWhatsAppLink, Remark } from "@/components/crm/crmHelpers"
 import Drawer from "@/components/ui/drawer"
 import Dropdown from "@/components/ui/dropdown"
 import WhatsAppIcon from "@/components/common/WhatsAppIcon"
@@ -57,6 +58,7 @@ export type ServiceRequest = {
   payload: Record<string, any>
   admin_notes: string | null
   assigned_to?: string | null
+  remarks?: Remark[] | null
   created_at: string
   updated_at: string
 }
@@ -95,12 +97,13 @@ const SERVICE_TYPE_META: Record<
 const STATUS_META: Record<string, { label: string; badge: string }> = {
   NEW: { label: "New / Unactioned", badge: "bg-rose-50 text-rose-700 ring-rose-200 border-rose-200" },
   CONTACTED: { label: "Contacted", badge: "bg-amber-50 text-amber-700 ring-amber-200 border-amber-200" },
+  FOLLOW_UP: { label: "Follow-up", badge: "bg-blue-50 text-blue-700 ring-blue-200 border-blue-200" },
   IN_PROGRESS: { label: "In Progress", badge: "bg-blue-50 text-blue-700 ring-blue-200 border-blue-200" },
   COMPLETED: { label: "Completed", badge: "bg-emerald-50 text-emerald-700 ring-emerald-200 border-emerald-200" },
   CLOSED: { label: "Closed", badge: "bg-slate-100 text-slate-600 ring-slate-200 border-slate-200" },
 }
 
-const STATUS_LIST = ["NEW", "CONTACTED", "IN_PROGRESS", "COMPLETED", "CLOSED"]
+const STATUS_LIST = ["NEW", "CONTACTED", "FOLLOW_UP", "IN_PROGRESS", "COMPLETED", "CLOSED"]
 
 function DetailBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -135,6 +138,10 @@ export default function ServiceRequestsPage() {
   const [selectedReq, setSelectedReq] = useState<ServiceRequest | null>(null)
   const [notes, setNotes] = useState("")
   const [isSavingNotes, setIsSavingNotes] = useState(false)
+
+  // Communication log (follow-up history)
+  const [remarkText, setRemarkText] = useState("")
+  const [savingRemark, setSavingRemark] = useState(false)
 
   // Team assignment
   const { users: assignableUsers } = useAssignableUsers()
@@ -223,6 +230,28 @@ export default function ServiceRequestsPage() {
         .eq("id", id)
 
       if (error) throw error
+
+      // Record the assignment in the communication log for management review
+      const req = requests.find((r) => r.id === id)
+      if (req) {
+        const assignee = assignableUsers.find(
+          (u) => String(u.adminLoginID) === String(nextOwner),
+        )?.username
+        const entry: Remark = {
+          id: crypto.randomUUID(),
+          type: "assignment",
+          text: nextOwner ? `Ticket assigned to ${assignee ?? nextOwner}` : "Assignment cleared",
+          author: getSession()?.username ?? "admin",
+          createdAt: new Date().toISOString(),
+        }
+        const nextRemarks = [...(req.remarks ?? []), entry]
+        const { error: logError } = await supabase
+          .from("service_requests")
+          .update({ remarks: nextRemarks })
+          .eq("id", id)
+        if (!logError) patchService(id, { remarks: nextRemarks })
+      }
+
       toast.success(nextOwner ? "Ticket assigned" : "Assignment cleared")
     } catch (err: any) {
       setRequests((list) =>
@@ -232,6 +261,57 @@ export default function ServiceRequestsPage() {
         setSelectedReq((curr) => (curr ? { ...curr, assigned_to: prevOwner } : null))
       }
       toast.error(`Unable to assign: ${err?.message || err}`)
+    }
+  }
+
+  const patchService = (id: string, patch: Partial<ServiceRequest>) => {
+    setRequests((list) => list.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+    setSelectedReq((curr) => (curr && curr.id === id ? { ...curr, ...patch } : curr))
+  }
+
+  const addServiceRemark = async () => {
+    if (!selectedReq || !remarkText.trim()) return
+    setSavingRemark(true)
+    try {
+      const session = getSession()
+      const remark: Remark = {
+        id: crypto.randomUUID(),
+        text: remarkText.trim(),
+        author: session?.username ?? "admin",
+        createdAt: new Date().toISOString(),
+      }
+      const next = [...(selectedReq.remarks ?? []), remark]
+
+      const { error } = await supabase
+        .from("service_requests")
+        .update({ remarks: next })
+        .eq("id", selectedReq.id)
+
+      if (error) throw error
+      patchService(selectedReq.id, { remarks: next })
+      setRemarkText("")
+      toast.success("Added to communication log")
+    } catch (err: any) {
+      toast.error(`Could not add to log: ${err?.message || err}`)
+    } finally {
+      setSavingRemark(false)
+    }
+  }
+
+  const deleteServiceRemark = async (remarkId: string) => {
+    if (!selectedReq) return
+    try {
+      const next = (selectedReq.remarks ?? []).filter((r) => r.id !== remarkId)
+      const { error } = await supabase
+        .from("service_requests")
+        .update({ remarks: next })
+        .eq("id", selectedReq.id)
+
+      if (error) throw error
+      patchService(selectedReq.id, { remarks: next })
+      toast.success("Entry deleted")
+    } catch (err: any) {
+      toast.error(`Could not delete entry: ${err?.message || err}`)
     }
   }
 
@@ -931,6 +1011,73 @@ export default function ServiceRequestsPage() {
                   >
                     {isSavingNotes ? "Saving..." : "Save Notes"}
                   </button>
+                </div>
+              </div>
+
+              {/* Communication log — follow-up history for management review */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Communication Log
+                </h4>
+                <p className="mt-0.5 text-[11px] text-slate-400">
+                  Every call, WhatsApp or email follow-up is recorded here with who did it and when.
+                </p>
+
+                <div className="mt-3 flex gap-2">
+                  <textarea
+                    rows={2}
+                    value={remarkText}
+                    onChange={(e) => setRemarkText(e.target.value)}
+                    placeholder="Call outcome, WhatsApp follow-up, next step…"
+                    className="w-full resize-none rounded-xl border border-slate-200 p-3 text-xs font-medium text-slate-800 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                  />
+                  <button
+                    onClick={addServiceRemark}
+                    disabled={savingRemark || !remarkText.trim()}
+                    className="h-fit shrink-0 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-60 cursor-pointer"
+                  >
+                    {savingRemark ? "Saving…" : "Add"}
+                  </button>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {(selectedReq.remarks ?? []).filter((r) => r.type !== "assignment").length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400">
+                      No follow-ups recorded yet.
+                    </p>
+                  ) : (
+                    [...(selectedReq.remarks ?? [])]
+                      .filter((r) => r.type !== "assignment")
+                      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+                      .map((entry) => (
+                        <div
+                          key={entry.id}
+                          className="group flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="whitespace-pre-wrap break-words text-xs font-medium text-slate-800">
+                              {entry.text}
+                            </p>
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              {entry.author} ·{" "}
+                              {new Date(entry.createdAt).toLocaleString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => deleteServiceRemark(entry.id)}
+                            title="Delete entry"
+                            className="shrink-0 rounded-md p-1.5 text-slate-300 transition hover:bg-rose-50 hover:text-rose-600"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      ))
+                  )}
                 </div>
               </div>
             </div>

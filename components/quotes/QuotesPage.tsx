@@ -77,6 +77,7 @@ export type QuoteOrder = {
 const STATUSES = [
   "QUOTE_REQUESTED",
   "CONTACTED",
+  "FOLLOW_UP",
   "QUOTED",
   "COMPLETED",
   "CANCELLED",
@@ -85,6 +86,7 @@ const STATUSES = [
 const statusTone: Record<string, string> = {
   QUOTE_REQUESTED: "bg-amber-50 text-amber-800 ring-amber-200 border-amber-300",
   CONTACTED: "bg-blue-50 text-blue-800 ring-blue-200 border-blue-300",
+  FOLLOW_UP: "bg-blue-50 text-blue-800 ring-blue-200 border-blue-300",
   QUOTED: "bg-blue-50 text-blue-800 ring-blue-200 border-blue-300",
   COMPLETED:
     "bg-emerald-50 text-emerald-800 ring-emerald-200 border-emerald-300",
@@ -94,6 +96,7 @@ const statusTone: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   QUOTE_REQUESTED: "Quote Requested",
   CONTACTED: "Contacted",
+  FOLLOW_UP: "Follow-up",
   QUOTED: "Quoted",
   COMPLETED: "Completed / Order Placed",
   CANCELLED: "Cancelled",
