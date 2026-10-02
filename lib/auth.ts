@@ -8,6 +8,8 @@ export type Session = {
   companyName:string
 
   role: string
+  /** Feature keys granted to this user via the Admin Users form. */
+  permissions: string[]
   loggedIn: boolean
   
 }
@@ -22,5 +24,3 @@ export function getSession(): Session | null {
 export function logout() {
   localStorage.removeItem('session')
 }
-
-

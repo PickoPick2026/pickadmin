@@ -20,12 +20,16 @@ import {
   Send,
   ShoppingBag,
   Sparkles,
+  Trash2,
   Truck,
   User,
   X,
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useAuth } from "@/hooks/useAuth"
+import { canDeleteLeads } from "@/config/rolePermissions"
 
 export type ServiceRequest = {
   id: string
@@ -120,6 +124,16 @@ export default function ServiceRequestsPage() {
   const [selectedReq, setSelectedReq] = useState<ServiceRequest | null>(null)
   const [notes, setNotes] = useState("")
   const [isSavingNotes, setIsSavingNotes] = useState(false)
+
+  // Bulk selection (cleanup of bot/junk leads)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+
+  // Bulk select/delete is only shown to users with the Delete Leads permission.
+  const { role, session } = useAuth()
+  const canDelete = canDeleteLeads(role, session?.permissions)
+  const colCount = canDelete ? 9 : 8
 
   const loadRequests = async () => {
     setLoading(true)
@@ -226,6 +240,76 @@ export default function ServiceRequestsPage() {
       return false
     })
   }, [requests, typeFilter, statusFilter, searchQuery])
+
+  // --- Bulk selection & delete ---
+
+  const allFilteredSelected =
+    filteredRequests.length > 0 &&
+    filteredRequests.every((r) => selectedIds.includes(r.id))
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(filteredRequests.map((r) => r.id))
+    }
+    setConfirmBulkDelete(false)
+  }
+
+  const toggleSelectRow = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    )
+    setConfirmBulkDelete(false)
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return
+    if (!confirmBulkDelete) {
+      setConfirmBulkDelete(true)
+      return
+    }
+
+    setIsBulkDeleting(true)
+    try {
+      // .select() makes Supabase return the deleted rows — an RLS-silent block
+      // (0 rows affected, no error) can then be detected and reported.
+      const { data, error } = await supabase
+        .from("service_requests")
+        .delete()
+        .in("id", selectedIds)
+        .select("id")
+
+      if (error) {
+        toast.error(`Bulk delete failed: ${error.message}`)
+        return
+      }
+
+      const deletedIds = ((data || []) as { id: string }[]).map((r) => r.id)
+      if (deletedIds.length === 0) {
+        toast.error(
+          "The database blocked the delete (row-level security has no delete policy for this table). Nothing was deleted.",
+        )
+        return
+      }
+
+      setRequests((prev) => prev.filter((r) => !deletedIds.includes(r.id)))
+      setSelectedIds([])
+      setConfirmBulkDelete(false)
+
+      if (deletedIds.length < selectedIds.length) {
+        toast.warning(
+          `Deleted ${deletedIds.length} of ${selectedIds.length} — the database blocked the rest (row-level security).`,
+        )
+      } else {
+        toast.success(`Deleted ${deletedIds.length} service request${deletedIds.length === 1 ? "" : "s"}`)
+      }
+    } catch {
+      toast.error("Bulk delete failed")
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }
 
   const stats = useMemo(() => {
     return {
@@ -380,12 +464,63 @@ export default function ServiceRequestsPage() {
         </div>
       </div>
 
+      {/* Bulk action bar (Delete Leads permission only) */}
+      {canDelete && selectedIds.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+          <span className="text-sm font-bold text-indigo-900">
+            {selectedIds.length} selected
+          </span>
+          <button
+            onClick={() => {
+              setSelectedIds([])
+              setConfirmBulkDelete(false)
+            }}
+            className="cursor-pointer text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+          >
+            Clear selection
+          </button>
+          <div className="ml-auto flex items-center gap-2">
+            {confirmBulkDelete && (
+              <span className="text-xs font-semibold text-rose-600">
+                Permanently delete {selectedIds.length} request
+                {selectedIds.length === 1 ? "" : "s"}?
+              </span>
+            )}
+            <button
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting}
+              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold text-white transition disabled:opacity-60 ${
+                confirmBulkDelete
+                  ? "bg-rose-600 hover:bg-rose-700"
+                  : "bg-slate-900 hover:bg-slate-800"
+              }`}
+            >
+              <Trash2 size={14} />
+              {isBulkDeleting
+                ? "Deleting…"
+                : confirmBulkDelete
+                  ? "Yes, delete permanently"
+                  : `Delete selected (${selectedIds.length})`}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
         <div className="overflow-x-auto">
-          <table className="min-w-[950px] w-full text-left text-sm">
+          <table className="min-w-[990px] w-full text-left text-sm">
             <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
+                {canDelete && (
+                  <th className="p-3.5 w-10">
+                    <Checkbox
+                      aria-label="Select all filtered requests"
+                      checked={allFilteredSelected}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </th>
+                )}
                 <th className="p-3.5">Reference Code</th>
                 <th className="p-3.5">Service Type</th>
                 <th className="p-3.5">Customer</th>
@@ -399,14 +534,14 @@ export default function ServiceRequestsPage() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400 font-medium">
+                  <td colSpan={colCount} className="py-12 text-center text-slate-400 font-medium">
                     <RefreshCw className="inline-block animate-spin mr-2" size={16} />
                     Loading service requests...
                   </td>
                 </tr>
               ) : filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500">
+                  <td colSpan={colCount} className="py-12 text-center text-slate-500">
                     <Package className="mx-auto h-8 w-8 text-slate-300 mb-2" />
                     <p className="font-semibold">No service requests found</p>
                     <p className="text-xs text-slate-400 mt-1">
@@ -441,6 +576,17 @@ export default function ServiceRequestsPage() {
                       key={req.id}
                       className="hover:bg-slate-50/70 transition-colors align-top group"
                     >
+                      {/* Bulk select (Delete Leads permission only) */}
+                      {canDelete && (
+                        <td className="p-3.5">
+                          <Checkbox
+                            aria-label={`Select ${req.request_code}`}
+                            checked={selectedIds.includes(req.id)}
+                            onCheckedChange={() => toggleSelectRow(req.id)}
+                          />
+                        </td>
+                      )}
+
                       {/* Code */}
                       <td className="p-3.5 font-mono text-xs font-bold text-indigo-700">
                         {req.request_code}

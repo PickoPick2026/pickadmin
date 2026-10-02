@@ -13,9 +13,16 @@ import {
   RefreshCw,
   Search,
   ShoppingBag,
+  UserPlus,
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
+import { getSession } from "@/lib/auth"
+import { useAuth } from "@/hooks/useAuth"
+import { canDeleteLeads } from "@/config/rolePermissions"
+import LeadActionsDrawer, { Remark } from "@/components/crm/LeadActionsDrawer"
+import DeleteLeadButton from "@/components/crm/DeleteLeadButton"
+import { useAssignableUsers, userNameById } from "@/components/crm/useAssignableUsers"
 
 export type OrderItem = {
   id: string
@@ -44,6 +51,8 @@ export type QuoteOrder = {
   customer_email: string | null
   shipping_address: string | null
   created_at: string
+  assigned_to?: number | null
+  remarks?: Remark[] | null
   order_items?: OrderItem[]
 }
 
@@ -77,6 +86,11 @@ export default function QuotesPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedQuote, setSelectedQuote] = useState<QuoteOrder | null>(null)
+  const [actionQuote, setActionQuote] = useState<QuoteOrder | null>(null)
+  const [assigning, setAssigning] = useState(false)
+  const { users } = useAssignableUsers()
+  const { role, session } = useAuth()
+  const canDelete = canDeleteLeads(role, session?.permissions)
 
   // Edit states inside modal
   const [editStatus, setEditStatus] = useState<string>("QUOTE_REQUESTED")
@@ -145,6 +159,90 @@ export default function QuotesPage() {
       toast.success(`Status updated to ${statusLabels[newStatus] || newStatus}`)
     } catch (err: any) {
       toast.error(`Could not update status: ${err?.message || err}`)
+    }
+  }
+
+  // --- CRM: ownership + remarks (stored as JSON on the order row) ---
+
+  const patchCrmFields = (id: string, patch: Partial<QuoteOrder>) => {
+    patchLocalQuote(id, patch)
+    setActionQuote((curr) => (curr && curr.id === id ? { ...curr, ...patch } : curr))
+  }
+
+  const assignQuote = async (quote: QuoteOrder, userId: number | null) => {
+    setAssigning(true)
+    const { error } = await supabase
+      .from("orders")
+      .update({ assigned_to: userId })
+      .eq("id", quote.id)
+    setAssigning(false)
+
+    if (error) return toast.error(`Could not assign owner: ${error.message}`)
+    patchCrmFields(quote.id, { assigned_to: userId })
+    toast.success(
+      userId
+        ? `Assigned to ${userNameById(users, userId) ?? "user"}`
+        : "Owner cleared",
+    )
+  }
+
+  const addQuoteRemark = async (quote: QuoteOrder, text: string) => {
+    const session = getSession()
+    const remark: Remark = {
+      id: crypto.randomUUID(),
+      text,
+      author: session?.username ?? "admin",
+      createdAt: new Date().toISOString(),
+    }
+    const next = [...(quote.remarks ?? []), remark]
+    const { error } = await supabase
+      .from("orders")
+      .update({ remarks: next })
+      .eq("id", quote.id)
+
+    if (error) return toast.error(`Could not add remark: ${error.message}`)
+    patchCrmFields(quote.id, { remarks: next })
+    toast.success("Remark added")
+  }
+
+  const deleteQuoteRemark = async (quote: QuoteOrder, remarkId: string) => {
+    const next = (quote.remarks ?? []).filter((r) => r.id !== remarkId)
+    const { error } = await supabase
+      .from("orders")
+      .update({ remarks: next })
+      .eq("id", quote.id)
+
+    if (error) return toast.error(`Could not delete remark: ${error.message}`)
+    patchCrmFields(quote.id, { remarks: next })
+    toast.success("Remark deleted")
+  }
+
+  // Permanently remove a quote request and its items (permission-gated).
+  const deleteQuote = async (quote: QuoteOrder) => {
+    try {
+      // Items reference the order — clear them first to avoid FK errors.
+      await supabase.from("order_items").delete().eq("order_id", quote.id)
+      // .select() lets us detect an RLS-silent block (success, 0 rows deleted).
+      const { data, error } = await supabase
+        .from("orders")
+        .delete()
+        .eq("id", quote.id)
+        .select("id")
+
+      if (error) throw error
+      if (!data || data.length === 0) {
+        toast.error(
+          "The database blocked the delete (row-level security has no delete policy for quote requests). Nothing was deleted.",
+        )
+        return
+      }
+
+      setQuotes((prev) => prev.filter((q) => q.id !== quote.id))
+      setSelectedQuote(null)
+      setActionQuote((curr) => (curr?.id === quote.id ? null : curr))
+      toast.success(`Deleted ${quote.order_code}`)
+    } catch (err: any) {
+      toast.error(`Could not delete: ${err?.message || err}`)
     }
   }
 
@@ -360,6 +458,7 @@ export default function QuotesPage() {
               <th className="p-3.5">Products Picked</th>
               <th className="p-3.5">Total Units</th>
               <th className="p-3.5">Status</th>
+              <th className="p-3.5">Owner</th>
               <th className="p-3.5">Quoted Total</th>
               <th className="p-3.5">Date Requested</th>
               <th className="p-3.5 text-right">Actions</th>
@@ -368,7 +467,7 @@ export default function QuotesPage() {
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={8} className="p-8 text-center text-slate-500">
+                <td colSpan={9} className="p-8 text-center text-slate-500">
                   <div className="flex items-center justify-center gap-2">
                     <RefreshCw size={18} className="animate-spin text-indigo-600" />
                     <span>Loading quote requests...</span>
@@ -377,7 +476,7 @@ export default function QuotesPage() {
               </tr>
             ) : filteredQuotes.length === 0 ? (
               <tr>
-                <td colSpan={8} className="p-10 text-center text-slate-500">
+                <td colSpan={9} className="p-10 text-center text-slate-500">
                   <ShoppingBag className="mx-auto mb-3 h-10 w-10 text-slate-300" />
                   <p className="font-semibold text-slate-700">No quote requests found</p>
                   <p className="mt-1 text-xs text-slate-400">
@@ -479,6 +578,27 @@ export default function QuotesPage() {
                       </select>
                     </td>
 
+                    {/* Owner */}
+                    <td className="p-3.5 align-top">
+                      {quote.assigned_to ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold uppercase text-white">
+                            {(userNameById(users, quote.assigned_to) ?? "?")[0]}
+                          </span>
+                          {userNameById(users, quote.assigned_to) ?? `#${quote.assigned_to}`}
+                        </span>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
+                          Unassigned
+                        </span>
+                      )}
+                      {(quote.remarks?.length ?? 0) > 0 && (
+                        <p className="mt-1 text-[11px] text-slate-400">
+                          {quote.remarks?.length} remark{(quote.remarks?.length ?? 0) === 1 ? "" : "s"}
+                        </p>
+                      )}
+                    </td>
+
                     {/* Quoted Total */}
                     <td className="p-3.5 align-top">
                       {quote.total > 0 ? (
@@ -528,6 +648,13 @@ export default function QuotesPage() {
                           <Eye size={14} />
                           View
                         </button>
+                        <button
+                          onClick={() => setActionQuote(quote)}
+                          title="Assign owner & manage remarks"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-indigo-300 hover:text-indigo-600"
+                        >
+                          <UserPlus size={15} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -561,12 +688,17 @@ export default function QuotesPage() {
                   Requested on {new Date(selectedQuote.created_at).toLocaleString("en-IN")}
                 </p>
               </div>
-              <button
-                onClick={() => setSelectedQuote(null)}
-                className="cursor-pointer rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                {canDelete && selectedQuote && (
+                  <DeleteLeadButton onDelete={() => deleteQuote(selectedQuote)} />
+                )}
+                <button
+                  onClick={() => setSelectedQuote(null)}
+                  className="cursor-pointer rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {/* Modal Body */}
@@ -804,6 +936,64 @@ export default function QuotesPage() {
                   </div>
                 </div>
               </div>
+              {/* Ownership & remarks (CRM) */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-600">
+                  Owner & Remarks
+                </h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-600">
+                      Assigned owner
+                    </span>
+                    <select
+                      value={selectedQuote.assigned_to ?? ""}
+                      onChange={(e) =>
+                        assignQuote(selectedQuote, e.target.value ? Number(e.target.value) : null)
+                      }
+                      disabled={assigning}
+                      className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-600 disabled:opacity-60"
+                    >
+                      <option value="">Unassigned</option>
+                      {users.map((u) => (
+                        <option key={u.adminLoginID} value={u.adminLoginID}>
+                          {u.username}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-600">
+                      Add remark
+                    </span>
+                    <QuoteRemarkInput onSave={(text) => addQuoteRemark(selectedQuote, text)} />
+                  </label>
+                </div>
+
+                {(selectedQuote.remarks?.length ?? 0) > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {selectedQuote.remarks?.map((remark) => (
+                      <div
+                        key={remark.id}
+                        className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white p-2.5"
+                      >
+                        <div>
+                          <p className="text-sm text-slate-800">{remark.text}</p>
+                          <p className="mt-0.5 text-[11px] text-slate-400">
+                            {remark.author} · {new Date(remark.createdAt).toLocaleString("en-IN")}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => deleteQuoteRemark(selectedQuote, remark.id)}
+                          className="shrink-0 text-xs font-semibold text-rose-500 hover:text-rose-600"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Modal Footer Actions */}
@@ -825,6 +1015,71 @@ export default function QuotesPage() {
           </div>
         </div>
       )}
+
+      {/* CRM drawer: owner assignment + remarks + contact */}
+      <LeadActionsDrawer
+        open={!!actionQuote}
+        onClose={() => setActionQuote(null)}
+        code={actionQuote?.order_code}
+        title={actionQuote?.customer_name || "Customer Quote Request"}
+        subtitle={
+          actionQuote
+            ? `Requested on ${new Date(actionQuote.created_at).toLocaleString("en-IN")}`
+            : undefined
+        }
+        customerName={actionQuote?.customer_name}
+        phone={actionQuote?.customer_phone}
+        email={actionQuote?.customer_email}
+        whatsappMessage={
+          actionQuote
+            ? `Hello ${actionQuote.customer_name || "Customer"}, regarding your Pick O Pick product quote request (${actionQuote.order_code}). We have reviewed your items and have an update for you.`
+            : undefined
+        }
+        statuses={STATUSES.map((st) => ({ value: st, label: statusLabels[st] || st }))}
+        status={actionQuote?.status ?? "QUOTE_REQUESTED"}
+        onStatusChange={(status) => actionQuote && changeStatusQuick(actionQuote, status)}
+        users={users}
+        assignedTo={actionQuote?.assigned_to ?? null}
+        onAssign={(userId) => actionQuote && assignQuote(actionQuote, userId)}
+        assigning={assigning}
+        remarks={actionQuote?.remarks ?? []}
+        onAddRemark={(text) => actionQuote && addQuoteRemark(actionQuote, text)}
+        onDeleteRemark={(remarkId) => actionQuote && deleteQuoteRemark(actionQuote, remarkId)}
+      />
+    </div>
+  )
+}
+
+function QuoteRemarkInput({ onSave }: { onSave: (text: string) => unknown }) {
+  const [text, setText] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    const value = text.trim()
+    if (!value) return
+    setSaving(true)
+    await onSave(value)
+    setSaving(false)
+    setText("")
+  }
+
+  return (
+    <div className="flex gap-2">
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && save()}
+        placeholder="Follow-up note…"
+        className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm outline-none focus:border-indigo-600"
+      />
+      <button
+        type="button"
+        onClick={save}
+        disabled={saving || !text.trim()}
+        className="shrink-0 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-800 disabled:opacity-50"
+      >
+        {saving ? "…" : "Add"}
+      </button>
     </div>
   )
 }

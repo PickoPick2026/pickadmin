@@ -10,9 +10,16 @@ import {
   Package,
   RefreshCw,
   Search,
+  UserPlus,
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
+import { getSession } from "@/lib/auth"
+import { useAuth } from "@/hooks/useAuth"
+import { canDeleteLeads } from "@/config/rolePermissions"
+import LeadActionsDrawer, { Remark } from "@/components/crm/LeadActionsDrawer"
+import DeleteLeadButton from "@/components/crm/DeleteLeadButton"
+import { useAssignableUsers, userNameById } from "@/components/crm/useAssignableUsers"
 
 type EstimateLead = {
   id: string
@@ -31,6 +38,8 @@ type EstimateLead = {
   admin_notes: string | null
   created_at: string
   updated_at: string
+  assigned_to?: number | null
+  remarks?: Remark[] | null
 }
 
 const STATUSES: EstimateLead["status"][] = ["NEW", "CONTACTED", "QUOTED", "CONVERTED", "CLOSED"]
@@ -61,6 +70,11 @@ export default function EstimateLeadsPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | EstimateLead["status"]>("all")
   const [query, setQuery] = useState("")
   const [selected, setSelected] = useState<EstimateLead | null>(null)
+  const [actionLead, setActionLead] = useState<EstimateLead | null>(null)
+  const [assigning, setAssigning] = useState(false)
+  const { users } = useAssignableUsers()
+  const { role, session } = useAuth()
+  const canDelete = canDeleteLeads(role, session?.permissions)
   const [draftNotes, setDraftNotes] = useState("")
   const [draftQuote, setDraftQuote] = useState("")
   const [savingDetails, setSavingDetails] = useState(false)
@@ -115,6 +129,7 @@ export default function EstimateLeadsPage() {
   const patchLead = (id: string, patch: Partial<EstimateLead>) => {
     setLeads((items) => items.map((item) => (item.id === id ? { ...item, ...patch } : item)))
     setSelected((item) => (item && item.id === id ? { ...item, ...patch } : item))
+    setActionLead((item) => (item && item.id === id ? { ...item, ...patch } : item))
   }
 
   const changeStatus = async (lead: EstimateLead, status: EstimateLead["status"]) => {
@@ -122,6 +137,61 @@ export default function EstimateLeadsPage() {
     if (error) return toast.error(`Could not update status: ${error.message}`)
     patchLead(lead.id, { status })
     toast.success("Status updated")
+  }
+
+  // --- CRM: ownership + remarks (JSON column on estimate_leads) ---
+
+  const assignLead = async (lead: EstimateLead, userId: number | null) => {
+    setAssigning(true)
+    const { error } = await supabase.from("estimate_leads").update({ assigned_to: userId }).eq("id", lead.id)
+    setAssigning(false)
+    if (error) return toast.error(`Could not assign owner: ${error.message}`)
+    patchLead(lead.id, { assigned_to: userId })
+    toast.success(userId ? `Assigned to ${userNameById(users, userId) ?? "user"}` : "Owner cleared")
+  }
+
+  const addLeadRemark = async (lead: EstimateLead, text: string) => {
+    const session = getSession()
+    const remark: Remark = {
+      id: crypto.randomUUID(),
+      text,
+      author: session?.username ?? "admin",
+      createdAt: new Date().toISOString(),
+    }
+    const next = [...(lead.remarks ?? []), remark]
+    const { error } = await supabase.from("estimate_leads").update({ remarks: next }).eq("id", lead.id)
+    if (error) return toast.error(`Could not add remark: ${error.message}`)
+    patchLead(lead.id, { remarks: next })
+    toast.success("Remark added")
+  }
+
+  const deleteLeadRemark = async (lead: EstimateLead, remarkId: string) => {
+    const next = (lead.remarks ?? []).filter((r) => r.id !== remarkId)
+    const { error } = await supabase.from("estimate_leads").update({ remarks: next }).eq("id", lead.id)
+    if (error) return toast.error(`Could not delete remark: ${error.message}`)
+    patchLead(lead.id, { remarks: next })
+    toast.success("Remark deleted")
+  }
+
+  // Permanently remove an estimate lead (permission-gated).
+  const deleteLead = async (lead: EstimateLead) => {
+    // .select() lets us detect an RLS-silent block (success, 0 rows deleted).
+    const { data, error } = await supabase
+      .from("estimate_leads")
+      .delete()
+      .eq("id", lead.id)
+      .select("id")
+
+    if (error) return toast.error(`Could not delete: ${error.message}`)
+    if (!data || data.length === 0) {
+      return toast.error(
+        "The database blocked the delete (row-level security has no delete policy for estimate leads). Nothing was deleted.",
+      )
+    }
+    setLeads((items) => items.filter((item) => item.id !== lead.id))
+    setSelected(null)
+    setActionLead((curr) => (curr?.id === lead.id ? null : curr))
+    toast.success(`Deleted ${lead.request_code}`)
   }
 
   const saveDetails = async () => {
@@ -207,6 +277,7 @@ export default function EstimateLeadsPage() {
               <th className="p-3">Contact</th>
               <th className="p-3">Shipment</th>
               <th className="p-3">Status</th>
+              <th className="p-3">Owner</th>
               <th className="p-3">Received</th>
               <th className="p-3 text-right">Details</th>
             </tr>
@@ -214,13 +285,13 @@ export default function EstimateLeadsPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td className="p-6 text-center text-slate-500" colSpan={7}>
+                <td className="p-6 text-center text-slate-500" colSpan={8}>
                   Loading estimate leads…
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td className="p-6 text-center text-slate-500" colSpan={7}>
+                <td className="p-6 text-center text-slate-500" colSpan={8}>
                   No estimate leads found.
                 </td>
               </tr>
@@ -259,13 +330,38 @@ export default function EstimateLeadsPage() {
                     </select>
                   </td>
                   <td className="p-3 text-xs text-slate-500">{new Date(lead.created_at).toLocaleString()}</td>
+                  <td className="p-3">
+                    {lead.assigned_to ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
+                        {userNameById(users, lead.assigned_to) ?? `#${lead.assigned_to}`}
+                      </span>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
+                        Unassigned
+                      </span>
+                    )}
+                    {(lead.remarks?.length ?? 0) > 0 && (
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {lead.remarks?.length} remark{(lead.remarks?.length ?? 0) === 1 ? "" : "s"}
+                      </p>
+                    )}
+                  </td>
                   <td className="p-3 text-right">
-                    <button
-                      onClick={() => openLead(lead)}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
-                    >
-                      <Eye size={15} /> View
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => openLead(lead)}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                      >
+                        <Eye size={15} /> View
+                      </button>
+                      <button
+                        onClick={() => setActionLead(lead)}
+                        title="Assign owner & manage remarks"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"
+                      >
+                        <UserPlus size={15} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -288,12 +384,15 @@ export default function EstimateLeadsPage() {
                 <p className="font-mono text-xs font-bold text-orange-600">{selected.request_code}</p>
                 <h2 className="mt-1 text-xl font-bold">{selected.customer_name}</h2>
               </div>
-              <button
-                onClick={() => setSelected(null)}
-                className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-2">
+                {canDelete && <DeleteLeadButton onDelete={() => deleteLead(selected)} />}
+                <button
+                  onClick={() => setSelected(null)}
+                  className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
+                >
+                  Close
+                </button>
+              </div>
             </div>
 
             <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
@@ -381,6 +480,49 @@ export default function EstimateLeadsPage() {
           </div>
         </div>
       )}
+
+      <LeadActionsDrawer
+        open={!!actionLead}
+        onClose={() => setActionLead(null)}
+        code={actionLead?.request_code}
+        title={actionLead?.customer_name ?? "Estimate lead"}
+        subtitle={
+          actionLead
+            ? `Received ${new Date(actionLead.created_at).toLocaleString("en-IN")} · destination ${actionLead.destination_country}`
+            : undefined
+        }
+        customerName={actionLead?.customer_name}
+        phone={actionLead?.whatsapp_number}
+        email={actionLead?.email}
+        statuses={STATUSES.map((s) => ({ value: s, label: s }))}
+        status={actionLead?.status ?? "NEW"}
+        onStatusChange={(status) =>
+          actionLead && changeStatus(actionLead, status as EstimateLead["status"])
+        }
+        users={users}
+        assignedTo={actionLead?.assigned_to ?? null}
+        onAssign={(userId) => actionLead && assignLead(actionLead, userId)}
+        assigning={assigning}
+        remarks={actionLead?.remarks ?? []}
+        onAddRemark={(text) => actionLead && addLeadRemark(actionLead, text)}
+        onDeleteRemark={(remarkId) => actionLead && deleteLeadRemark(actionLead, remarkId)}
+      >
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+            <Package size={14} /> Request details
+          </h3>
+          <div className="mt-3 grid grid-cols-1 gap-x-5 gap-y-3 text-sm sm:grid-cols-2">
+            <Field label="Destination country" value={actionLead?.destination_country} />
+            <Field label="Package type" value={actionLead?.package_type} />
+            <Field
+              label="Approx. weight"
+              value={actionLead?.approx_weight_kg != null ? `${actionLead.approx_weight_kg} kg` : null}
+            />
+            <Field label="Dimensions" value={actionLead?.dimensions} />
+            <Field label="What they are shipping" value={actionLead?.requirement_description} />
+          </div>
+        </section>
+      </LeadActionsDrawer>
     </div>
   )
 }

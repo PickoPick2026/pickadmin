@@ -5,22 +5,24 @@ import Image from "next/image"
 import { LogOut } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
-import { rolePermissions } from "@/config/rolePermissions"
+import { canManageUsers, resolvePermissions } from "@/config/rolePermissions"
 import { menuItems } from "@/config/menuItems"
 import { handleLogout } from "@/lib/logout"
 
 export default function Sidenav({ collapsed }: { collapsed: boolean }) {
   const router = useRouter()
-  const { role, loading } = useAuth()
+  const { role, session, loading } = useAuth()
   const pathname = usePathname()
-
-  const allowedKeys = rolePermissions[role as keyof typeof rolePermissions] ?? []
 
   if (loading) return null
 
-  const navItems = menuItems.filter(
-    (item) => item.key !== "logout" && allowedKeys.includes(item.key),
+  // Admin Users is a super-admin-only area; everything else follows the
+  // user's stored permission checkboxes.
+  const allowedKeys = resolvePermissions(role, session?.permissions).filter(
+    (key) => key !== "users" || canManageUsers(role),
   )
+
+  const navItems = menuItems.filter((item) => allowedKeys.includes(item.key))
 
   return (
     <aside
@@ -29,11 +31,27 @@ export default function Sidenav({ collapsed }: { collapsed: boolean }) {
     >
       {/* Logo */}
       <div className="flex h-16 shrink-0 items-center border-b border-white/10 px-4">
-        {collapsed ? (
-          <Image src="/images/favicon.png" alt="Logo" width={32} height={32} />
-        ) : (
-          <Image src="/images/logo.png" alt="Logo" width={120} height={32} />
-        )}
+        <Link href="/dashboard" className="flex items-center">
+          {collapsed ? (
+            <Image
+              src="/images/PICKLogoMark.png"
+              alt="Pick O Pick"
+              width={36}
+              height={22}
+              priority
+              className="h-auto w-9 object-contain"
+            />
+          ) : (
+            <Image
+              src="/images/PICKLogoMark.png"
+              alt="Pick O Pick"
+              width={104}
+              height={64}
+              priority
+              className="h-auto w-[104px] object-contain"
+            />
+          )}
+        </Link>
       </div>
 
       {/* Menu (scrollable) */}

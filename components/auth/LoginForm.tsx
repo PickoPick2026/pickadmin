@@ -35,10 +35,16 @@ export default function LoginForm() {
         return
       }
 
+      if (adminLogin.adminLoginStatus === false) {
+        toast.error("Your account is inactive. Please contact a super admin.")
+        return
+      }
+
       localStorage.setItem("session", JSON.stringify({
         id: adminLogin.adminLoginID,
         username: adminLogin.username,
         role: adminLogin.role,
+        permissions: Array.isArray(adminLogin.permissions) ? adminLogin.permissions : [],
         loggedIn: true,
       }))
       toast.success("Login successful")
@@ -54,7 +60,7 @@ export default function LoginForm() {
   return (
     <CardContent className="p-6 sm:p-9">
       <div className="mb-8 text-center">
-        <Image src="https://pickopick.com/PICKLogo.png" alt="Pick O Pick" width={150} height={58} className="mx-auto h-auto w-[130px] sm:w-[150px]" priority />
+        <Image src="/images/PICKLogo-transparent.png" alt="Pick O Pick" width={150} height={105} className="mx-auto h-auto w-[130px] sm:w-[150px]" priority />
         <h1 className="mt-6 text-2xl font-extrabold tracking-tight text-slate-900">Welcome back</h1>
         <p className="mt-2 text-sm text-slate-500">Sign in to manage Pick O Pick operations.</p>
       </div>

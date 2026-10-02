@@ -2,20 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getSession } from '@/lib/auth'
-
-type Session = {
-  id: string
-  userID: string
-  username: string
-
-  name:string
-  companyID:string
-  companyName:string
-
-  role: string
-  loggedIn: boolean
-}
+import { getSession, Session } from '@/lib/auth'
 
 export function useAuth() {
   const router = useRouter()
@@ -44,6 +31,7 @@ export function useAuth() {
     loading,
     session,
     role: session?.role ?? null,
+    permissions: session?.permissions ?? [],
     isLoggedIn: !!session?.loggedIn,
     logout
   }

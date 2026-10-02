@@ -1,14 +1,21 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { MapPin, Pencil, Trash2 } from "lucide-react"
+import { Download, MapPin, Pencil, Sheet, Trash2 } from "lucide-react"
 import { Customer } from "./CustomerPage"
 import TablePagination from "@/components/common/TablePagination"
 import { ITEMS_PER_PAGE } from "@/lib/tableperpage"
 import { EmptyRow, IconButton, TableCard, Thead, Tr } from "@/components/common/table"
+import { buildWhatsAppLink } from "@/components/crm/LeadActionsDrawer"
+import { MessageCircle } from "lucide-react"
 
 const initials = (first: string, last: string) =>
   `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?"
+
+const formatDate = (value?: string | null) =>
+  value
+    ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : "—"
 
 export default function CustomerList({
   customers,
@@ -29,23 +36,26 @@ export default function CustomerList({
 
   return (
     <>
-      <TableCard minWidth={860}>
+      <TableCard minWidth={960}>
         <Thead>
           <tr>
             <th className="p-3">Customer</th>
             <th className="p-3">Pick ID</th>
             <th className="p-3">Contact</th>
+            <th className="p-3">Country</th>
+            <th className="p-3">Joined</th>
             <th className="p-3">Addresses</th>
             <th className="p-3 text-right">Actions</th>
           </tr>
         </Thead>
         <tbody>
           {data.length === 0 ? (
-            <EmptyRow colSpan={5}>No customers found</EmptyRow>
+            <EmptyRow colSpan={7}>No customers found</EmptyRow>
           ) : (
             data.map((c) => {
               const addresses = c.addresses ?? []
               const isOpen = expanded === c.customerID
+              const wa = buildWhatsAppLink(c.phoneNumber, `Hello ${c.firstName}, this is Pick O Pick support.`)
               return (
                 <Tr key={c.customerID}>
                   <td className="p-3">
@@ -65,13 +75,17 @@ export default function CustomerList({
                   </td>
 
                   <td className="p-3">
-                    <span className="font-mono text-xs text-slate-500">{c.pickID}</span>
+                    <span className="font-mono text-xs font-semibold text-[#0B56D9]">{c.pickID}</span>
                   </td>
 
                   <td className="p-3">
                     <p className="text-slate-700">{c.phoneNumber}</p>
                     <p className="text-xs text-slate-400">{c.emailID || "—"}</p>
                   </td>
+
+                  <td className="p-3 text-slate-700">{c.country || "—"}</td>
+
+                  <td className="p-3 text-xs text-slate-500">{formatDate(c.created_at)}</td>
 
                   <td className="p-3">
                     {addresses.length === 0 ? (
@@ -114,6 +128,17 @@ export default function CustomerList({
 
                   <td className="p-3">
                     <div className="flex items-center justify-end gap-1">
+                      {wa && (
+                        <a
+                          href={wa}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Chat on WhatsApp"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600"
+                        >
+                          <MessageCircle size={15} />
+                        </a>
+                      )}
                       <IconButton onClick={() => onEdit(c)} title="Edit customer" tone="blue">
                         <Pencil size={15} />
                       </IconButton>

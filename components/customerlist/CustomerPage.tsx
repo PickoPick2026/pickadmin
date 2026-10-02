@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button"
 import { supabase } from "@/lib/supabase"
 
 import { toast } from "sonner"
+import * as XLSX from "xlsx"
+import { saveAs } from "file-saver"
+import { FileDown, FileSpreadsheet } from "lucide-react"
 import CustomerList from "./CustomerList"
 import CustomerForm from "./CustomerForm"
 import PageHeader from "@/components/common/PageHeader"
@@ -27,6 +30,8 @@ export type Customer = {
   emailID: string
   gender: string
   dob: string
+  country?: string | null
+  created_at?: string
   customerStatus: boolean
   password: string
   addresses?: Address[]
@@ -239,6 +244,48 @@ export default function CustomerPage() {
     fetchCustomers()
   }
 
+  // Full-detail export of the current (filtered) customer list.
+  const exportRows = () =>
+    filteredCustomers.map((c) => ({
+      "Pick ID": c.pickID,
+      "First Name": c.firstName,
+      "Last Name": c.lastName,
+      Phone: c.phoneNumber,
+      Email: c.emailID || "",
+      Gender: c.gender || "",
+      "Date of Birth": c.dob || "",
+      Country: c.country || "",
+      "Joined On": c.created_at ? new Date(c.created_at).toLocaleDateString("en-IN") : "",
+      Addresses: (c.addresses ?? [])
+        .map((a) => `${a.addressType}: ${a.addressDetails}${a.isDefault ? " (default)" : ""}`)
+        .join(" | "),
+    }))
+
+  const exportExcel = () => {
+    const rows = exportRows()
+    if (rows.length === 0) return toast.error("No customers to export")
+
+    const worksheet = XLSX.utils.json_to_sheet(rows)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Customers")
+    const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
+    saveAs(
+      new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+      `pickopick-customers-${new Date().toISOString().slice(0, 10)}.xlsx`,
+    )
+    toast.success(`Exported ${rows.length} customers to Excel`)
+  }
+
+  const exportCSV = () => {
+    const rows = exportRows()
+    if (rows.length === 0) return toast.error("No customers to export")
+
+    const worksheet = XLSX.utils.json_to_sheet(rows)
+    const csv = XLSX.utils.sheet_to_csv(worksheet)
+    saveAs(new Blob([csv], { type: "text/csv;charset=utf-8" }), `pickopick-customers-${new Date().toISOString().slice(0, 10)}.csv`)
+    toast.success(`Exported ${rows.length} customers to CSV`)
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -249,7 +296,17 @@ export default function CustomerPage() {
           onChange: setSearch,
           placeholder: "Search name, phone or email…",
         }}
-        actions={<Button onClick={() => setOpen(true)}>Add Customer</Button>}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={exportCSV}>
+              <FileDown size={16} /> Export CSV
+            </Button>
+            <Button variant="outline" onClick={exportExcel}>
+              <FileSpreadsheet size={16} /> Export Excel
+            </Button>
+            <Button onClick={() => setOpen(true)}>Add Customer</Button>
+          </div>
+        }
       />
 
       <CustomerList

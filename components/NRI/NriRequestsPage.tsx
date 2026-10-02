@@ -1,14 +1,21 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { CalendarClock, ClipboardList, Eye, Headphones, MapPin, RefreshCw, Truck } from "lucide-react"
+import { CalendarClock, ClipboardList, Eye, Headphones, MapPin, RefreshCw, Truck, UserPlus } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
+import { getSession } from "@/lib/auth"
+import { useAuth } from "@/hooks/useAuth"
+import { canDeleteLeads } from "@/config/rolePermissions"
+import LeadActionsDrawer, { Remark } from "@/components/crm/LeadActionsDrawer"
+import DeleteLeadButton from "@/components/crm/DeleteLeadButton"
+import { useAssignableUsers, userNameById } from "@/components/crm/useAssignableUsers"
 
 type NriRequest = {
   id: string; request_code: string; request_type: "consultation" | "slot_reservation" | "pickup_request"; status: string
   customer_name: string; whatsapp_number: string; email: string | null; country: string; preferred_date: string | null
   preferred_time: string | null; payload: Record<string, unknown>; created_at: string
+  assigned_to?: number | null; remarks?: Remark[] | null
 }
 
 const typeLabels: Record<NriRequest["request_type"], string> = {
@@ -53,6 +60,11 @@ export default function NriRequestsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState("all")
   const [selected, setSelected] = useState<NriRequest | null>(null)
+  const [actionItem, setActionItem] = useState<NriRequest | null>(null)
+  const [assigning, setAssigning] = useState(false)
+  const { users } = useAssignableUsers()
+  const { role, session } = useAuth()
+  const canDelete = canDeleteLeads(role, session?.permissions)
 
   const loadRequests = async () => {
     setLoading(true)
@@ -75,9 +87,64 @@ export default function NriRequestsPage() {
   const changeStatus = async (request: NriRequest, status: string) => {
     const { error } = await supabase.from("nri_requests").update({ status }).eq("id", request.id)
     if (error) return toast.error(`Could not update status: ${error.message}`)
-    setRequests((items) => items.map((item) => item.id === request.id ? { ...item, status } : item))
-    setSelected((item) => item?.id === request.id ? { ...item, status } : item)
+    patchRequest(request.id, { status })
     toast.success("Request status updated")
+  }
+
+  // --- CRM: ownership + remarks (JSON column on nri_requests) ---
+
+  const patchRequest = (id: string, patch: Partial<NriRequest>) => {
+    setRequests((items) => items.map((item) => item.id === id ? { ...item, ...patch } : item))
+    setSelected((item) => item?.id === id ? { ...item, ...patch } : item)
+    setActionItem((item) => item?.id === id ? { ...item, ...patch } : item)
+  }
+
+  const assignRequest = async (request: NriRequest, userId: number | null) => {
+    setAssigning(true)
+    const { error } = await supabase.from("nri_requests").update({ assigned_to: userId }).eq("id", request.id)
+    setAssigning(false)
+    if (error) return toast.error(`Could not assign owner: ${error.message}`)
+    patchRequest(request.id, { assigned_to: userId })
+    toast.success(userId ? `Assigned to ${userNameById(users, userId) ?? "user"}` : "Owner cleared")
+  }
+
+  const addRequestRemark = async (request: NriRequest, text: string) => {
+    const session = getSession()
+    const remark: Remark = { id: crypto.randomUUID(), text, author: session?.username ?? "admin", createdAt: new Date().toISOString() }
+    const next = [...(request.remarks ?? []), remark]
+    const { error } = await supabase.from("nri_requests").update({ remarks: next }).eq("id", request.id)
+    if (error) return toast.error(`Could not add remark: ${error.message}`)
+    patchRequest(request.id, { remarks: next })
+    toast.success("Remark added")
+  }
+
+  const deleteRequestRemark = async (request: NriRequest, remarkId: string) => {
+    const next = (request.remarks ?? []).filter((r) => r.id !== remarkId)
+    const { error } = await supabase.from("nri_requests").update({ remarks: next }).eq("id", request.id)
+    if (error) return toast.error(`Could not delete remark: ${error.message}`)
+    patchRequest(request.id, { remarks: next })
+    toast.success("Remark deleted")
+  }
+
+  // Permanently remove an NRI request (permission-gated).
+  const deleteRequest = async (request: NriRequest) => {
+    // .select() lets us detect an RLS-silent block (success, 0 rows deleted).
+    const { data, error } = await supabase
+      .from("nri_requests")
+      .delete()
+      .eq("id", request.id)
+      .select("id")
+
+    if (error) return toast.error(`Could not delete: ${error.message}`)
+    if (!data || data.length === 0) {
+      return toast.error(
+        "The database blocked the delete (row-level security has no delete policy for NRI requests). Nothing was deleted.",
+      )
+    }
+    setRequests((items) => items.filter((item) => item.id !== request.id))
+    setSelected(null)
+    setActionItem((curr) => (curr?.id === request.id ? null : curr))
+    toast.success(`Deleted ${request.request_code}`)
   }
 
   return <div className="space-y-5">
@@ -94,15 +161,36 @@ export default function NriRequestsPage() {
       {[{ value: "all", label: `All (${requests.length})` }, ...Object.entries(typeLabels).map(([value, label]) => ({ value, label }))].map((item) => <button key={item.value} onClick={() => setFilter(item.value)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${filter === item.value ? "bg-slate-900 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200"}`}>{item.label}</button>)}
     </div>
 
-    <div className="overflow-x-auto rounded-xl border bg-white"><table className="min-w-[820px] w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="p-3">Reference</th><th className="p-3">Customer</th><th className="p-3">Contact</th><th className="p-3">Schedule</th><th className="p-3">Status</th><th className="p-3">Received</th><th className="p-3 text-right">Details</th></tr></thead>
-      <tbody>{loading ? <tr><td className="p-6 text-center text-slate-500" colSpan={7}>Loading requests…</td></tr> : filtered.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={7}>No NRI requests found.</td></tr> : filtered.map((request) => <tr key={request.id} className="border-t align-top"><td className="p-3"><p className="font-mono text-xs font-semibold text-orange-600">{request.request_code}</p><p className="mt-1 text-xs font-medium text-slate-500">{typeLabels[request.request_type]}</p></td><td className="p-3"><p className="font-medium">{request.customer_name}</p><p className="text-xs text-slate-500">{request.country || "—"}</p></td><td className="p-3"><p>{request.whatsapp_number}</p><p className="text-xs text-slate-500">{request.email || "—"}</p></td><td className="p-3 text-xs"><p>{request.preferred_date || "Flexible"}</p><p className="mt-1 text-slate-500">{request.preferred_time || "Flexible"}</p></td><td className="p-3"><select value={request.status} onChange={(e) => changeStatus(request, e.target.value)} className="rounded-md border bg-white px-2 py-1 text-xs font-semibold"><option value={request.status}>{request.status}</option>{statuses.filter((s) => s !== request.status).map((s) => <option key={s} value={s}>{s}</option>)}</select></td><td className="p-3 text-xs text-slate-500">{new Date(request.created_at).toLocaleString()}</td><td className="p-3 text-right"><button onClick={() => setSelected(request)} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"><Eye size={15} /> View</button></td></tr>)}</tbody>
+    <div className="overflow-x-auto rounded-xl border bg-white"><table className="min-w-[920px] w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="p-3">Reference</th><th className="p-3">Customer</th><th className="p-3">Contact</th><th className="p-3">Schedule</th><th className="p-3">Status</th><th className="p-3">Owner</th><th className="p-3">Received</th><th className="p-3 text-right">Details</th></tr></thead>
+      <tbody>{loading ? <tr><td className="p-6 text-center text-slate-500" colSpan={8}>Loading requests…</td></tr> : filtered.length === 0 ? <tr><td className="p-6 text-center text-slate-500" colSpan={8}>No NRI requests found.</td></tr> : filtered.map((request) => <tr key={request.id} className="border-t align-top"><td className="p-3"><p className="font-mono text-xs font-semibold text-orange-600">{request.request_code}</p><p className="mt-1 text-xs font-medium text-slate-500">{typeLabels[request.request_type]}</p></td><td className="p-3"><p className="font-medium">{request.customer_name}</p><p className="text-xs text-slate-500">{request.country || "—"}</p></td><td className="p-3"><p>{request.whatsapp_number}</p><p className="text-xs text-slate-500">{request.email || "—"}</p></td><td className="p-3 text-xs"><p>{request.preferred_date || "Flexible"}</p><p className="mt-1 text-slate-500">{request.preferred_time || "Flexible"}</p></td><td className="p-3"><select value={request.status} onChange={(e) => changeStatus(request, e.target.value)} className="rounded-md border bg-white px-2 py-1 text-xs font-semibold"><option value={request.status}>{request.status}</option>{statuses.filter((s) => s !== request.status).map((s) => <option key={s} value={s}>{s}</option>)}</select></td><td className="p-3">{request.assigned_to ? <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">{userNameById(users, request.assigned_to) ?? `#${request.assigned_to}`}</span> : <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">Unassigned</span>}{(request.remarks?.length ?? 0) > 0 && <p className="mt-1 text-[11px] text-slate-400">{request.remarks?.length} remark{(request.remarks?.length ?? 0) === 1 ? "" : "s"}</p>}</td><td className="p-3 text-xs text-slate-500">{new Date(request.created_at).toLocaleString()}</td><td className="p-3 text-right"><div className="flex items-center justify-end gap-1"><button onClick={() => setSelected(request)} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"><Eye size={15} /> View</button><button onClick={() => setActionItem(request)} title="Assign owner & manage remarks" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"><UserPlus size={15} /></button></div></td></tr>)}</tbody>
     </table></div>
 
     {selected && <div className="fixed inset-0 z-50 flex items-end bg-slate-900/40 p-0 sm:items-center sm:justify-center sm:p-4" onClick={() => setSelected(null)}><div className="max-h-[88vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:max-w-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-      <div className="flex items-start justify-between gap-4"><div><p className="font-mono text-xs font-bold text-orange-600">{selected.request_code}</p><h2 className="mt-1 text-xl font-bold">{typeLabels[selected.request_type]}</h2></div><button onClick={() => setSelected(null)} className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100">Close</button></div>
+      <div className="flex items-start justify-between gap-4"><div><p className="font-mono text-xs font-bold text-orange-600">{selected.request_code}</p><h2 className="mt-1 text-xl font-bold">{typeLabels[selected.request_type]}</h2></div><div className="flex items-center gap-2">{canDelete && <DeleteLeadButton onDelete={() => deleteRequest(selected)} />}<button onClick={() => setSelected(null)} className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100">Close</button></div></div>
       <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600"><span className="font-bold text-slate-800">Status:</span> {selected.status} <span className="mx-2 text-slate-300">•</span> Received {new Date(selected.created_at).toLocaleString()}</div>
       <RequestDetails request={selected} />
       <details className="mt-5 rounded-xl border border-slate-200 bg-white"><summary className="cursor-pointer px-4 py-3 text-sm font-bold text-slate-800">View raw submitted JSON</summary><pre className="max-h-80 overflow-auto border-t bg-slate-950 p-4 text-xs leading-5 text-slate-100">{JSON.stringify(selected.payload, null, 2)}</pre></details>
     </div></div>}
+
+    <LeadActionsDrawer
+      open={!!actionItem}
+      onClose={() => setActionItem(null)}
+      code={actionItem?.request_code}
+      title={typeLabels[actionItem?.request_type ?? "consultation"]}
+      subtitle={actionItem ? `Received ${new Date(actionItem.created_at).toLocaleString("en-IN")}` : undefined}
+      customerName={actionItem?.customer_name}
+      phone={actionItem?.whatsapp_number}
+      email={actionItem?.email}
+      statuses={statuses.map((s) => ({ value: s, label: s }))}
+      status={actionItem?.status ?? "PENDING"}
+      onStatusChange={(status) => actionItem && changeStatus(actionItem, status)}
+      users={users}
+      assignedTo={actionItem?.assigned_to ?? null}
+      onAssign={(userId) => actionItem && assignRequest(actionItem, userId)}
+      assigning={assigning}
+      remarks={actionItem?.remarks ?? []}
+      onAddRemark={(text) => actionItem && addRequestRemark(actionItem, text)}
+      onDeleteRemark={(remarkId) => actionItem && deleteRequestRemark(actionItem, remarkId)}
+    />
   </div>
 }

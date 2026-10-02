@@ -1,52 +1,29 @@
 import {
   LayoutDashboard,
-  Users,
-  Building2,
   Layers,
-  Database,
-  Tag,
-  ToolCase,
-  Upload,
-  FileText,
-  PhoneCall,
-  Megaphone,
-  Coffee,
-  MessageCircle,
-  Grid3X3,
-  Library,
-  MessageSquareText,
-  Mail,
-  BarChart3,
-  GitBranch,
-  Target,
-  Settings,
-  LogOut,
-  LayoutGrid,
-  UserCircle,
   ClipboardList,
   Calculator,
   ShoppingBag,
   PackageCheck,
+  SquareKanban,
+  Settings,
+  Trash2,
+  Users,
 } from "lucide-react";
 
+/**
+ * Every entry maps to a real page in the admin. The sidebar renders this list
+ * filtered by the signed-in user's permissions (see Sidenav.tsx).
+ *
+ * Note: Category lives inside Product (Manage Categories) and Admin Users
+ * lives inside Admin Settings — neither gets a sidebar entry.
+ */
 export const menuItems = [
   {
     key: "dashboard",
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-  },
-  {
-    key: "users",
-    label: "Admin Users",
-    href: "/users",
-    icon: UserCircle,
-  },
-  {
-    key: "category",
-    label: "Category",
-    href: "/category",
-    icon: LayoutGrid,
   },
   {
     key: "product",
@@ -59,6 +36,12 @@ export const menuItems = [
     label: "Customer List",
     href: "/customer",
     icon: Users,
+  },
+  {
+    key: "kanban",
+    label: "Kanban Board",
+    href: "/kanban",
+    icon: SquareKanban,
   },
   {
     key: "services",
@@ -85,87 +68,34 @@ export const menuItems = [
     icon: Calculator,
   },
   {
-    key: "upload_leads",
-    label: "Import Leads",
-    href: "/uploadleads",
-    icon: Upload,
-  },
-  {
-    key: "leads",
-    label: "Leads",
-    href: "/leads",
-    icon: FileText,
-  },
-  {
-    key: "call_setting",
-    label: "Call Setting",
-    href: "#",
-    icon: PhoneCall,
-  },
-  {
-    key: "campaigns",
-    label: "Campaigns",
-    href: "#",
-    icon: Megaphone,
-  },
-  {
-    key: "chat",
-    label: "Chat",
-    href: "#",
-    icon: MessageCircle,
-  },
-  {
-    key: "apps",
-    label: "Apps",
-    href: "#",
-    icon: Grid3X3,
-  },
-  {
-    key: "digital_assets_library",
-    label: "Digital Assets Library",
-    href: "#",
-    icon: Library,
-  },
-  {
-    key: "sms",
-    label: "SMS",
-    href: "#",
-    icon: MessageSquareText,
-  },
-  {
-    key: "email",
-    label: "Email",
-    href: "/email",
-    icon: Mail,
-  },
-  {
-    key: "breakreport",
-    label: "Break Report",
-    href: "/reports",
-    icon: BarChart3,
-  },
-  {
-    key: "workflow",
-    label: "Wor Flow",
-    href: "#",
-    icon: GitBranch,
-  },
-  {
-    key: "outcomes",
-    label: "Outcomes",
-    href: "#",
-    icon: Target,
-  },
-  {
     key: "admin_settings",
     label: "Admin Settings",
     href: "/setting",
     icon: Settings,
   },
-  {
-    key: "logout",
-    label: "Logout",
-    href: "/",
-    icon: LogOut,
-  },
 ];
+
+/**
+ * Features that can be granted per user via checkboxes on the user form.
+ * Sidebar pages plus the special "Delete Leads" ability (not a page).
+ */
+export const assignableFeatures = [
+  ...menuItems.filter((item) => item.key !== "dashboard"),
+  { key: "delete_leads", label: "Delete Leads", icon: Trash2 },
+];
+
+/** Fallback permissions used when a user has no stored permissions yet. */
+export const defaultPermissions: Record<string, string[]> = {
+  SUPER_ADMIN: menuItems.map((item) => item.key),
+  ADMIN: [
+    "dashboard",
+    "product",
+    "customer",
+    "kanban",
+    "services",
+    "quotes",
+    "nri",
+    "estimates",
+  ],
+  STAFF: ["dashboard"],
+};

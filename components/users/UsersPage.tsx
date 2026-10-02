@@ -13,8 +13,9 @@ export type User = {
   adminLoginID: number
   username: string
   password: string
-  role: "ADMIN" | "STAFF"
+  role: "SUPER_ADMIN" | "ADMIN" | "STAFF"
   adminLoginStatus: boolean
+  permissions: string[]
 }
 
 export default function UsersPage() {
@@ -22,6 +23,7 @@ export default function UsersPage() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
   const [search, setSearch] = useState("")
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     fetchUsers()
@@ -39,23 +41,36 @@ export default function UsersPage() {
       .order("adminLoginID", { ascending: false })
 
     if (error) return console.error(error)
-    setUsers(data)
+    setUsers(
+      ((data || []) as any[]).map((u) => ({
+        ...u,
+        permissions: Array.isArray(u.permissions) ? u.permissions : [],
+      }))
+    )
   }
 
   const handleSave = async (user: User) => {
     const toastId = toast.loading("Saving user...")
+    setSaving(true)
 
     try {
-      const hashedPassword = await bcrypt.hash(user.password, 10)
+      // Blank password on edit means "keep the existing one".
+      const hashedPassword = user.password
+        ? await bcrypt.hash(user.password, 10)
+        : undefined
+
+      const payload: Record<string, unknown> = {
+        username: user.username,
+        role: user.role,
+        adminLoginStatus: user.adminLoginStatus,
+        permissions: user.permissions,
+      }
+      if (hashedPassword) payload.password = hashedPassword
 
       if (editing) {
         const { error } = await supabase
           .from("adminLoginTable")
-          .update({
-            username: user.username,
-            password: hashedPassword,
-            role: user.role,
-          })
+          .update(payload)
           .eq("adminLoginID", user.adminLoginID)
 
         if (error) throw error
@@ -65,10 +80,9 @@ export default function UsersPage() {
         const { data, error } = await supabase
           .from("adminLoginTable")
           .insert({
-            username: user.username,
+            ...payload,
             password: hashedPassword,
-            role: user.role,
-            adminLoginStatus: true,
+            adminLoginStatus: user.adminLoginStatus,
           })
           .select()
           .single()
@@ -84,6 +98,8 @@ export default function UsersPage() {
       fetchUsers()
     } catch (err: any) {
       toast.error(err.message, { id: toastId })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -92,14 +108,19 @@ export default function UsersPage() {
     setOpen(true)
   }
 
-  const handleDelete = async (id: number) => {
-    await supabase
+  const handleToggleStatus = async (user: User) => {
+    const next = !user.adminLoginStatus
+    const { error } = await supabase
       .from("adminLoginTable")
-      .update({ adminLoginStatus: false })
-      .eq("adminLoginID", id)
+      .update({ adminLoginStatus: next })
+      .eq("adminLoginID", user.adminLoginID)
 
-    fetchUsers()
-    toast.success("User deactivated")
+    if (error) return toast.error(`Could not update user: ${error.message}`)
+
+    setUsers((prev) =>
+      prev.map((u) => (u.adminLoginID === user.adminLoginID ? { ...u, adminLoginStatus: next } : u))
+    )
+    toast.success(next ? "User activated" : "User deactivated")
   }
 
   return (
@@ -115,11 +136,10 @@ export default function UsersPage() {
         actions={<Button onClick={() => setOpen(true)}>Add User</Button>}
       />
 
-
-
       {open && (
         <UserForm
           initialData={editing}
+          saving={saving}
           onClose={() => {
             setOpen(false)
             setEditing(null)
@@ -131,7 +151,7 @@ export default function UsersPage() {
       <UsersList
         users={filteredUsers}
         onEdit={handleEdit}
-        onDelete={handleDelete}
+        onToggleStatus={handleToggleStatus}
       />
     </div>
   )
