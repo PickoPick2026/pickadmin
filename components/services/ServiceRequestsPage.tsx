@@ -30,6 +30,7 @@ import { toast } from "sonner"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useAuth } from "@/hooks/useAuth"
 import { canDeleteLeads } from "@/config/rolePermissions"
+import { buildGmailLink, buildWhatsAppLink } from "@/components/crm/crmHelpers"
 
 export type ServiceRequest = {
   id: string
@@ -121,19 +122,18 @@ export default function ServiceRequestsPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
+
+  // Slide-over detail view
   const [selectedReq, setSelectedReq] = useState<ServiceRequest | null>(null)
   const [notes, setNotes] = useState("")
   const [isSavingNotes, setIsSavingNotes] = useState(false)
 
-  // Bulk selection (cleanup of bot/junk leads)
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
-  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
-
-  // Bulk select/delete is only shown to users with the Delete Leads permission.
+  // Bulk actions (Delete Leads permission only)
   const { role, session } = useAuth()
   const canDelete = canDeleteLeads(role, session?.permissions)
-  const colCount = canDelete ? 9 : 8
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
 
   const loadRequests = async () => {
     setLoading(true)
@@ -144,12 +144,12 @@ export default function ServiceRequestsPage() {
         .order("created_at", { ascending: false })
 
       if (error) {
-        toast.error(`Failed to fetch service requests: ${error.message}`)
+        toast.error(`Error loading service requests: ${error.message}`)
       } else {
         setRequests((data || []) as ServiceRequest[])
       }
-    } catch (err) {
-      toast.error("An error occurred while loading requests")
+    } catch {
+      toast.error("Failed to fetch service requests")
     } finally {
       setLoading(false)
     }
@@ -158,32 +158,39 @@ export default function ServiceRequestsPage() {
   useEffect(() => {
     loadRequests()
   }, [])
+
   const handleOpenDetails = (req: ServiceRequest) => {
     setSelectedReq(req)
     setNotes(req.admin_notes || "")
   }
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
+    const prev = requests.find((r) => r.id === id)?.status
+    if (prev === newStatus) return
+
+    // INSTANT optimistic update
+    setRequests((list) =>
+      list.map((r) => (r.id === id ? { ...r, status: newStatus } : r)),
+    )
+    if (selectedReq?.id === id) {
+      setSelectedReq((curr) => (curr ? { ...curr, status: newStatus } : null))
+    }
+
     try {
       const { error } = await supabase
         .from("service_requests")
         .update({ status: newStatus })
         .eq("id", id)
 
-      if (error) {
-        toast.error(`Failed to update status: ${error.message}`)
-        return
-      }
-
-      setRequests((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r)),
-      )
-      if (selectedReq?.id === id) {
-        setSelectedReq((prev) => (prev ? { ...prev, status: newStatus } : null))
-      }
+      if (error) throw error
       toast.success(`Status changed to ${newStatus}`)
-    } catch {
-      toast.error("Unable to update status")
+    } catch (err: any) {
+      if (prev) {
+        setRequests((list) =>
+          list.map((r) => (r.id === id ? { ...r, status: prev } : r)),
+        )
+      }
+      toast.error(`Unable to update status: ${err?.message || err}`)
     }
   }
 
@@ -228,13 +235,13 @@ export default function ServiceRequestsPage() {
         r.email,
         r.location,
         r.service_type,
-      ].some((val) => val?.toLowerCase().includes(q))
+      ].some((val) => String(val || "").toLowerCase().includes(q))
 
       if (matchMain) return true
 
-      if (r.payload && typeof r.payload === "object") {
+      if (r.payload) {
         const payloadStr = JSON.stringify(r.payload).toLowerCase()
-        return payloadStr.includes(q)
+        if (payloadStr.includes(q)) return true
       }
 
       return false
@@ -272,8 +279,6 @@ export default function ServiceRequestsPage() {
 
     setIsBulkDeleting(true)
     try {
-      // .select() makes Supabase return the deleted rows — an RLS-silent block
-      // (0 rows affected, no error) can then be detected and reported.
       const { data, error } = await supabase
         .from("service_requests")
         .delete()
@@ -322,10 +327,6 @@ export default function ServiceRequestsPage() {
     }
   }, [requests])
 
-  const formatPhoneForWa = (phone: string) => {
-    return phone.replace(/\D/g, "")
-  }
-
   return (
     <div className="space-y-6">
       {/* Header Bar */}
@@ -350,63 +351,30 @@ export default function ServiceRequestsPage() {
         </div>
       </div>
 
-      {/* KPI Stats Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Total Leads</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
-              <Package size={16} />
-            </div>
-          </div>
-          <p className="mt-3 text-2xl font-extrabold text-slate-900">{stats.total}</p>
-          <span className="text-[11px] text-slate-400 mt-1 block">All service submissions</span>
+          <span className="text-xs font-semibold text-slate-500">Total Requests</span>
+          <p className="text-2xl font-black text-slate-900 mt-1">{stats.total}</p>
         </div>
-
-        <div className="rounded-2xl border border-rose-200/80 bg-white p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-rose-600 uppercase tracking-wide">New / Action Required</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
-              <AlertCircle size={16} />
-            </div>
-          </div>
-          <p className="mt-3 text-2xl font-extrabold text-rose-600">{stats.newCount}</p>
-          <span className="text-[11px] text-slate-400 mt-1 block">Uncontacted leads</span>
+        <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-4 shadow-2xs">
+          <span className="text-xs font-bold text-rose-700">New / Unactioned</span>
+          <p className="text-2xl font-black text-rose-800 mt-1">{stats.newCount}</p>
         </div>
-
-        <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">Order & Send</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
-              <Truck size={16} />
-            </div>
-          </div>
-          <p className="mt-3 text-2xl font-extrabold text-slate-900">{stats.orderSend}</p>
-          <span className="text-[11px] text-slate-400 mt-1 block">India pickup & delivery</span>
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-4 shadow-2xs">
+          <span className="text-xs font-bold text-blue-700">Order & Send</span>
+          <p className="text-2xl font-black text-blue-800 mt-1">{stats.orderSend}</p>
         </div>
-
-        <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">Buy & Ship</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-              <ShoppingBag size={16} />
-            </div>
-          </div>
-          <p className="mt-3 text-2xl font-extrabold text-slate-900">{stats.buyShip}</p>
-          <span className="text-[11px] text-slate-400 mt-1 block">Assisted shopping</span>
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 shadow-2xs">
+          <span className="text-xs font-bold text-emerald-700">Buy & Ship</span>
+          <p className="text-2xl font-black text-emerald-800 mt-1">{stats.buyShip}</p>
         </div>
-
-        <div className="rounded-2xl border border-purple-100 bg-white p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-purple-700 uppercase tracking-wide">Exclusive Sourcing</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-700">
-              <Sparkles size={16} />
-            </div>
-          </div>
-          <p className="mt-3 text-2xl font-extrabold text-slate-900">{stats.exclusive}</p>
-          <span className="text-[11px] text-slate-400 mt-1 block">Laddu, Halwa, Regional</span>
+        <div className="rounded-2xl border border-purple-200 bg-purple-50/40 p-4 shadow-2xs">
+          <span className="text-xs font-bold text-purple-700">Exclusive Sourcing</span>
+          <p className="text-2xl font-black text-purple-800 mt-1">{stats.exclusive}</p>
         </div>
       </div>
+
       {/* Filter Bar: Tabs & Controls */}
       <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
         {/* Type Tabs */}
@@ -499,53 +467,59 @@ export default function ServiceRequestsPage() {
               {isBulkDeleting
                 ? "Deleting…"
                 : confirmBulkDelete
-                  ? "Yes, delete permanently"
-                  : `Delete selected (${selectedIds.length})`}
+                  ? "Confirm Delete"
+                  : "Delete Selected"}
             </button>
           </div>
         </div>
       )}
 
-      {/* Main Table */}
+      {/* Requests Table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
         <div className="overflow-x-auto">
-          <table className="min-w-[990px] w-full text-left text-sm">
-            <thead className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-slate-100 bg-slate-50/75 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
                 {canDelete && (
                   <th className="p-3.5 w-10">
                     <Checkbox
-                      aria-label="Select all filtered requests"
+                      aria-label="Select all"
                       checked={allFilteredSelected}
                       onCheckedChange={toggleSelectAll}
                     />
                   </th>
                 )}
-                <th className="p-3.5">Reference Code</th>
+                <th className="p-3.5">Reference ID</th>
                 <th className="p-3.5">Service Type</th>
                 <th className="p-3.5">Customer</th>
                 <th className="p-3.5">Contact</th>
-                <th className="p-3.5">Requirements / Location</th>
+                <th className="p-3.5">Requirements Preview</th>
                 <th className="p-3.5">Status</th>
-                <th className="p-3.5">Date</th>
+                <th className="p-3.5">Submitted On</th>
                 <th className="p-3.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 font-medium">
               {loading ? (
                 <tr>
-                  <td colSpan={colCount} className="py-12 text-center text-slate-400 font-medium">
-                    <RefreshCw className="inline-block animate-spin mr-2" size={16} />
-                    Loading service requests...
+                  <td
+                    colSpan={canDelete ? 9 : 8}
+                    className="p-12 text-center text-slate-400"
+                  >
+                    <RefreshCw className="mx-auto mb-2 animate-spin text-indigo-600" size={24} />
+                    <p className="text-xs font-semibold">Loading service requests…</p>
                   </td>
                 </tr>
               ) : filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={colCount} className="py-12 text-center text-slate-500">
-                    <Package className="mx-auto h-8 w-8 text-slate-300 mb-2" />
-                    <p className="font-semibold">No service requests found</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Try clearing search filters or check back later.
+                  <td
+                    colSpan={canDelete ? 9 : 8}
+                    className="p-12 text-center text-slate-400"
+                  >
+                    <AlertCircle className="mx-auto mb-2 text-slate-300" size={28} />
+                    <p className="text-xs font-bold text-slate-600">No service requests found</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Adjust your filters or wait for new incoming requests.
                     </p>
                   </td>
                 </tr>
@@ -571,10 +545,20 @@ export default function ServiceRequestsPage() {
                     req.payload?.productLinks ||
                     req.location
 
+                  const waLink = buildWhatsAppLink(
+                    req.phone,
+                    `Hello ${req.customer_name}, regarding your Pick O Pick ${typeMeta.label} request (${req.request_code}).`,
+                  )
+                  const gmailLink = buildGmailLink(
+                    req.email,
+                    `Regarding Pick O Pick Service Request ${req.request_code}`,
+                    `Hello ${req.customer_name},\n\nRegarding your service request (${req.request_code}) for ${typeMeta.label}.\n\nPlease let us know if you need any assistance.\n\nBest regards,\nPick O Pick Team`,
+                  )
+
                   return (
                     <tr
                       key={req.id}
-                      className="hover:bg-slate-50/70 transition-colors align-top group"
+                      className="hover:bg-slate-50/70 transition-colors align-middle group"
                     >
                       {/* Bulk select (Delete Leads permission only) */}
                       {canDelete && (
@@ -662,13 +646,37 @@ export default function ServiceRequestsPage() {
 
                       {/* Actions */}
                       <td className="p-3.5 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => handleOpenDetails(req)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition cursor-pointer"
-                        >
-                          <Eye size={13} />
-                          <span>View</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {waLink && (
+                            <a
+                              href={waLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Chat on WhatsApp"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+                            >
+                              <MessageSquare size={13} />
+                            </a>
+                          )}
+                          {gmailLink && (
+                            <a
+                              href={gmailLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Compose in Gmail (pre-filled)"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
+                            >
+                              <Mail size={13} />
+                            </a>
+                          )}
+                          <button
+                            onClick={() => handleOpenDetails(req)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition cursor-pointer"
+                          >
+                            <Eye size={13} />
+                            <span>View</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -678,6 +686,7 @@ export default function ServiceRequestsPage() {
           </table>
         </div>
       </div>
+
       {/* Detail Slide-over / Modal */}
       {selectedReq && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs">
@@ -713,29 +722,51 @@ export default function ServiceRequestsPage() {
 
             {/* Modal Quick Actions Bar */}
             <div className="mt-5 flex flex-wrap gap-2">
-              <a
-                href={`https://wa.me/${formatPhoneForWa(selectedReq.phone)}?text=${encodeURIComponent(
-                  `Hello ${selectedReq.customer_name}, regarding your Pick O Pick ${
-                    SERVICE_TYPE_META[selectedReq.service_type]?.label || "service"
-                  } request (${selectedReq.request_code}):`,
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white px-3.5 py-2 text-xs font-bold transition shadow-xs"
-              >
-                <MessageSquare size={14} />
-                Open WhatsApp
-              </a>
+              {buildWhatsAppLink(
+                selectedReq.phone,
+                `Hello ${selectedReq.customer_name}, regarding your Pick O Pick ${
+                  SERVICE_TYPE_META[selectedReq.service_type]?.label || "service"
+                } request (${selectedReq.request_code}):`,
+              ) && (
+                <a
+                  href={
+                    buildWhatsAppLink(
+                      selectedReq.phone,
+                      `Hello ${selectedReq.customer_name}, regarding your Pick O Pick ${
+                        SERVICE_TYPE_META[selectedReq.service_type]?.label || "service"
+                      } request (${selectedReq.request_code}):`,
+                    ) || "#"
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white px-3.5 py-2 text-xs font-bold transition shadow-xs"
+                >
+                  <MessageSquare size={14} />
+                  Open WhatsApp
+                </a>
+              )}
 
-              <a
-                href={`mailto:${selectedReq.email}?subject=${encodeURIComponent(
-                  `Pick O Pick Request Update - ${selectedReq.request_code}`,
-                )}`}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2 text-xs font-bold transition shadow-xs"
-              >
-                <Mail size={14} />
-                Email Customer
-              </a>
+              {buildGmailLink(
+                selectedReq.email,
+                `Pick O Pick Request Update - ${selectedReq.request_code}`,
+                `Hello ${selectedReq.customer_name},\n\nRegarding your Pick O Pick request (${selectedReq.request_code}).\n\nBest regards,\nPick O Pick Team`,
+              ) && (
+                <a
+                  href={
+                    buildGmailLink(
+                      selectedReq.email,
+                      `Pick O Pick Request Update - ${selectedReq.request_code}`,
+                      `Hello ${selectedReq.customer_name},\n\nRegarding your Pick O Pick request (${selectedReq.request_code}).\n\nBest regards,\nPick O Pick Team`,
+                    ) || "#"
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2 text-xs font-bold transition shadow-xs"
+                >
+                  <Mail size={14} />
+                  Compose in Gmail
+                </a>
+              )}
 
               <div className="ml-auto flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-500">Status:</span>

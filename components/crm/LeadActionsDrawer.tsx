@@ -1,61 +1,56 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Mail, MessageCircle, StickyNote, Trash2, UserPlus } from "lucide-react"
-import Drawer from "@/components/ui/drawer"
+import { useState } from "react";
 import {
-  AdminUser,
-  userNameById,
-} from "@/components/crm/useAssignableUsers"
+  Mail,
+  MessageCircle,
+  StickyNote,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
+import Drawer from "@/components/ui/drawer";
+import { AdminUser, userNameById } from "@/components/crm/useAssignableUsers";
+import {
+  Remark,
+  buildGmailLink,
+  buildWhatsAppLink,
+} from "@/components/crm/crmHelpers";
 
-export type Remark = {
-  id: string
-  text: string
-  author: string
-  createdAt: string
-}
-
-export const buildWhatsAppLink = (phone?: string | null, message = "Hello") => {
-  const clean = (phone || "").replace(/\D/g, "")
-  if (!clean) return null
-  const full = clean.startsWith("91")
-    ? clean
-    : clean.length === 10
-      ? `91${clean}`
-      : clean
-  return `https://wa.me/${full}?text=${encodeURIComponent(message)}`
-}
+export { buildGmailLink, buildWhatsAppLink };
+export type { Remark };
 
 type LeadActionsDrawerProps = {
-  open: boolean
-  onClose: () => void
-  code?: string | null
-  title: string
-  subtitle?: React.ReactNode
-  customerName?: string | null
-  phone?: string | null
-  email?: string | null
-  whatsappMessage?: string
+  open: boolean;
+  onClose: () => void;
+  code?: string | null;
+  title: string;
+  subtitle?: React.ReactNode;
+  customerName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  whatsappMessage?: string;
+  emailSubject?: string;
+  emailBody?: string;
 
-  statuses: { value: string; label: string }[]
-  status: string
-  onStatusChange: (status: string) => unknown
+  statuses: { value: string; label: string }[];
+  status: string;
+  onStatusChange: (status: string) => unknown;
 
-  users: AdminUser[]
-  assignedTo?: number | null
-  onAssign: (userId: number | null) => unknown
-  assigning?: boolean
+  users: AdminUser[];
+  assignedTo?: string | null;
+  onAssign: (userId: string | null) => unknown;
+  assigning?: boolean;
 
-  remarks?: Remark[] | null
-  onAddRemark?: (text: string) => unknown
-  onDeleteRemark?: (remarkId: string) => unknown
+  remarks?: Remark[] | null;
+  onAddRemark?: (text: string) => unknown;
+  onDeleteRemark?: (remarkId: string) => unknown;
 
-  children?: React.ReactNode
-}
+  children?: React.ReactNode;
+};
 
 /**
- * Generic CRM drawer: contact buttons, status, owner assignment and
- * JSON-backed remarks. The lead's own details can be passed as children.
+ * Generic CRM drawer: WhatsApp + direct Gmail compose, status, owner assignment and
+ * remarks. Lead-specific details can be passed as children.
  */
 export default function LeadActionsDrawer({
   open,
@@ -67,6 +62,8 @@ export default function LeadActionsDrawer({
   phone,
   email,
   whatsappMessage,
+  emailSubject,
+  emailBody,
   statuses,
   status,
   onStatusChange,
@@ -79,23 +76,34 @@ export default function LeadActionsDrawer({
   onDeleteRemark,
   children,
 }: LeadActionsDrawerProps) {
-  const [remarkText, setRemarkText] = useState("")
-  const [savingRemark, setSavingRemark] = useState(false)
+  const [remarkText, setRemarkText] = useState("");
+  const [savingRemark, setSavingRemark] = useState(false);
 
   const waLink = buildWhatsAppLink(
     phone,
     whatsappMessage ||
       `Hello ${customerName || "Customer"}, regarding your request${code ? ` (${code})` : ""} with Pick O Pick.`,
-  )
+  );
+
+  const gmailLink = buildGmailLink(
+    email,
+    emailSubject ||
+      (code
+        ? `Regarding Pick O Pick request ${code}`
+        : "Regarding your Pick O Pick request"),
+    emailBody ||
+      `Hello ${customerName || "Customer"},\n\nRegarding your request${code ? ` (${code})` : ""} with Pick O Pick. We have reviewed your request details and would like to assist you.\n\nPlease let us know if you have any questions.\n\nBest regards,\nPick O Pick Team`,
+  );
 
   const addRemark = async () => {
-    const text = remarkText.trim()
-    if (!text || !onAddRemark) return
-    setSavingRemark(true)
-    await onAddRemark(text)
-    setSavingRemark(false)
-    setRemarkText("")
-  }
+    const text = remarkText.trim();
+    if (!text || !onAddRemark) return;
+    setSavingRemark(true);
+    await onAddRemark(text);
+    setSavingRemark(false);
+    setRemarkText("");
+  };
+
   return (
     <Drawer
       open={open}
@@ -103,7 +111,11 @@ export default function LeadActionsDrawer({
       wide
       title={
         <div>
-          {code && <span className="block font-mono text-xs font-bold text-orange-600">{code}</span>}
+          {code && (
+            <span className="block font-mono text-xs font-bold text-orange-600">
+              {code}
+            </span>
+          )}
           <span className="mt-0.5 block truncate">{title}</span>
         </div>
       }
@@ -114,18 +126,20 @@ export default function LeadActionsDrawer({
             <a
               href={waLink}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               title="Chat with customer on WhatsApp"
               className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
             >
               <MessageCircle size={16} />
             </a>
           )}
-          {email && (
+          {gmailLink && (
             <a
-              href={`mailto:${email}${code ? `?subject=Regarding Pick O Pick request ${code}` : ""}`}
-              title="Email customer"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 transition hover:bg-slate-100"
+              href={gmailLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Compose email in Gmail (pre-filled)"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
             >
               <Mail size={16} />
             </a>
@@ -142,7 +156,7 @@ export default function LeadActionsDrawer({
           <div className="mt-1 flex items-center gap-2">
             <select
               value={assignedTo ?? ""}
-              onChange={(e) => onAssign(e.target.value ? Number(e.target.value) : null)}
+              onChange={(e) => onAssign(e.target.value || null)}
               disabled={assigning}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-indigo-500 disabled:opacity-60"
             >
@@ -155,15 +169,20 @@ export default function LeadActionsDrawer({
             </select>
             <UserPlus size={16} className="shrink-0 text-slate-400" />
           </div>
-          {assignedTo != null && (
-            <p className="mt-1 text-[11px] text-slate-400">
-              Current owner: {userNameById(users, assignedTo) ?? `#${assignedTo}`}
+          {assignedTo && (
+            <p className="mt-1 text-[11px] text-slate-500">
+              Current owner:{" "}
+              <span className="font-semibold text-indigo-700">
+                {userNameById(users, assignedTo) ?? `#${assignedTo}`}
+              </span>
             </p>
           )}
         </label>
 
         <label className="block">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Status</span>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            Status
+          </span>
           <select
             value={status}
             onChange={(e) => onStatusChange(e.target.value)}
@@ -208,7 +227,7 @@ export default function LeadActionsDrawer({
               placeholder="Call outcome, next follow-up, note for the team…"
               className="w-full resize-none rounded-lg border border-slate-300 p-2.5 text-sm outline-none focus:border-indigo-500"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) addRemark()
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) addRemark();
               }}
             />
             <button
@@ -222,12 +241,14 @@ export default function LeadActionsDrawer({
           </div>
 
           <div className="mt-3 space-y-2">
-            {(remarks ?? []).length === 0 ? (
+            {(remarks ?? []).filter((r) => r.type !== "assignment").length ===
+            0 ? (
               <p className="rounded-lg border border-dashed border-slate-200 p-3 text-center text-xs text-slate-400">
                 No remarks yet.
               </p>
             ) : (
               [...(remarks ?? [])]
+                .filter((r) => r.type !== "assignment")
                 .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
                 .map((remark) => (
                   <div
@@ -265,5 +286,5 @@ export default function LeadActionsDrawer({
         </section>
       )}
     </Drawer>
-  )
+  );
 }

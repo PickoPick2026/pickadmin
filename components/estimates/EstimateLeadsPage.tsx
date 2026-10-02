@@ -1,48 +1,65 @@
-"use client"
+"use client";
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react";
 import {
   Calculator,
   CheckCircle2,
   Eye,
   IndianRupee,
+  Mail,
   MapPin,
+  MessageCircle,
   Package,
   RefreshCw,
   Search,
   UserPlus,
-} from "lucide-react"
-import { supabase } from "@/lib/supabase"
-import { toast } from "sonner"
-import { getSession } from "@/lib/auth"
-import { useAuth } from "@/hooks/useAuth"
-import { canDeleteLeads } from "@/config/rolePermissions"
-import LeadActionsDrawer, { Remark } from "@/components/crm/LeadActionsDrawer"
-import DeleteLeadButton from "@/components/crm/DeleteLeadButton"
-import { useAssignableUsers, userNameById } from "@/components/crm/useAssignableUsers"
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+import { getSession } from "@/lib/auth";
+import { useAuth } from "@/hooks/useAuth";
+import { canDeleteLeads } from "@/config/rolePermissions";
+import LeadActionsDrawer, { Remark } from "@/components/crm/LeadActionsDrawer";
+import DeleteLeadButton from "@/components/crm/DeleteLeadButton";
+import {
+  useAssignableUsers,
+  userNameById,
+} from "@/components/crm/useAssignableUsers";
+import {
+  assignLeadOwner,
+  buildGmailLink,
+  buildWhatsAppLink,
+  resolveAssignedTo,
+} from "@/components/crm/crmHelpers";
 
 type EstimateLead = {
-  id: string
-  request_code: string
-  status: "NEW" | "CONTACTED" | "QUOTED" | "CONVERTED" | "CLOSED"
-  customer_name: string
-  whatsapp_number: string
-  email: string | null
-  destination_country: string
-  package_type: string | null
-  approx_weight_kg: number | null
-  dimensions: string | null
-  requirement_description: string | null
-  payload: Record<string, unknown>
-  quoted_amount: number | null
-  admin_notes: string | null
-  created_at: string
-  updated_at: string
-  assigned_to?: number | null
-  remarks?: Remark[] | null
-}
+  id: string;
+  request_code: string;
+  status: "NEW" | "CONTACTED" | "QUOTED" | "CONVERTED" | "CLOSED";
+  customer_name: string;
+  whatsapp_number: string;
+  email: string | null;
+  destination_country: string;
+  package_type: string | null;
+  approx_weight_kg: number | null;
+  dimensions: string | null;
+  requirement_description: string | null;
+  payload: Record<string, unknown>;
+  quoted_amount: number | null;
+  admin_notes: string | null;
+  created_at: string;
+  updated_at: string;
+  assigned_to?: string | null;
+  remarks?: Remark[] | null;
+};
 
-const STATUSES: EstimateLead["status"][] = ["NEW", "CONTACTED", "QUOTED", "CONVERTED", "CLOSED"]
+const STATUSES: EstimateLead["status"][] = [
+  "NEW",
+  "CONTACTED",
+  "QUOTED",
+  "CONVERTED",
+  "CLOSED",
+];
 
 const statusTone: Record<EstimateLead["status"], string> = {
   NEW: "bg-rose-50 text-rose-700 ring-rose-200",
@@ -50,60 +67,75 @@ const statusTone: Record<EstimateLead["status"], string> = {
   QUOTED: "bg-indigo-50 text-indigo-700 ring-indigo-200",
   CONVERTED: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   CLOSED: "bg-slate-100 text-slate-600 ring-slate-200",
-}
+};
 
 const text = (value: unknown, fallback = "—") =>
-  value === null || value === undefined || value === "" ? fallback : String(value)
+  value === null || value === undefined || value === ""
+    ? fallback
+    : String(value);
 
 function Field({ label, value }: { label: string; value: unknown }) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-0.5 break-words font-medium text-slate-800">{text(value)}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+      <p className="mt-0.5 break-words font-medium text-slate-800">
+        {text(value)}
+      </p>
     </div>
-  )
+  );
 }
 
 export default function EstimateLeadsPage() {
-  const [leads, setLeads] = useState<EstimateLead[]>([])
-  const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<"all" | EstimateLead["status"]>("all")
-  const [query, setQuery] = useState("")
-  const [selected, setSelected] = useState<EstimateLead | null>(null)
-  const [actionLead, setActionLead] = useState<EstimateLead | null>(null)
-  const [assigning, setAssigning] = useState(false)
-  const { users } = useAssignableUsers()
-  const { role, session } = useAuth()
-  const canDelete = canDeleteLeads(role, session?.permissions)
-  const [draftNotes, setDraftNotes] = useState("")
-  const [draftQuote, setDraftQuote] = useState("")
-  const [savingDetails, setSavingDetails] = useState(false)
+  const [leads, setLeads] = useState<EstimateLead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | EstimateLead["status"]
+  >("all");
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<EstimateLead | null>(null);
+  const [actionLead, setActionLead] = useState<EstimateLead | null>(null);
+  const [assigning, setAssigning] = useState(false);
+  const { users } = useAssignableUsers();
+  const { role, session } = useAuth();
+  const canDelete = canDeleteLeads(role, session?.permissions);
+  const [draftNotes, setDraftNotes] = useState("");
+  const [draftQuote, setDraftQuote] = useState("");
+  const [savingDetails, setSavingDetails] = useState(false);
 
   const loadLeads = async () => {
-    setLoading(true)
+    setLoading(true);
     const { data, error } = await supabase
       .from("estimate_leads")
       .select("*")
-      .order("created_at", { ascending: false })
-    if (error) toast.error(`Unable to load estimate leads: ${error.message}`)
-    else setLeads((data || []) as EstimateLead[])
-    setLoading(false)
-  }
+      .order("created_at", { ascending: false });
+    if (error) toast.error(`Unable to load estimate leads: ${error.message}`);
+    else {
+      setLeads(
+        (data || []).map((row: any) => ({
+          ...row,
+          assigned_to: resolveAssignedTo(row),
+        })),
+      );
+    }
+    setLoading(false);
+  };
   useEffect(() => {
-    loadLeads()
-  }, [])
+    loadLeads();
+  }, []);
 
   const openLead = (lead: EstimateLead) => {
-    setSelected(lead)
-    setDraftNotes(lead.admin_notes || "")
-    setDraftQuote(lead.quoted_amount != null ? String(lead.quoted_amount) : "")
-  }
+    setSelected(lead);
+    setDraftNotes(lead.admin_notes || "");
+    setDraftQuote(lead.quoted_amount != null ? String(lead.quoted_amount) : "");
+  };
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = query.trim().toLowerCase();
     return leads.filter((lead) => {
-      if (statusFilter !== "all" && lead.status !== statusFilter) return false
-      if (!q) return true
+      if (statusFilter !== "all" && lead.status !== statusFilter) return false;
+      if (!q) return true;
       return [
         lead.request_code,
         lead.customer_name,
@@ -112,164 +144,261 @@ export default function EstimateLeadsPage() {
         lead.destination_country,
       ]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(q))
-    })
-  }, [leads, statusFilter, query])
+        .some((value) => String(value).toLowerCase().includes(q));
+    });
+  }, [leads, statusFilter, query]);
 
   const stats = useMemo(
     () => [
-      { label: "All leads", value: leads.length, icon: Calculator, tone: "bg-slate-900 text-white" },
-      { label: "New / unactioned", value: leads.filter((l) => l.status === "NEW").length, icon: MapPin, tone: "bg-rose-50 text-rose-700" },
-      { label: "Quoted", value: leads.filter((l) => l.status === "QUOTED").length, icon: IndianRupee, tone: "bg-indigo-50 text-indigo-700" },
-      { label: "Converted", value: leads.filter((l) => l.status === "CONVERTED").length, icon: CheckCircle2, tone: "bg-emerald-50 text-emerald-700" },
+      {
+        label: "All leads",
+        value: leads.length,
+        icon: Calculator,
+        tone: "bg-slate-900 text-white",
+      },
+      {
+        label: "New / unactioned",
+        value: leads.filter((l) => l.status === "NEW").length,
+        icon: MapPin,
+        tone: "bg-rose-50 text-rose-700",
+      },
+      {
+        label: "Quoted",
+        value: leads.filter((l) => l.status === "QUOTED").length,
+        icon: IndianRupee,
+        tone: "bg-indigo-50 text-indigo-700",
+      },
+      {
+        label: "Converted",
+        value: leads.filter((l) => l.status === "CONVERTED").length,
+        icon: CheckCircle2,
+        tone: "bg-emerald-50 text-emerald-700",
+      },
     ],
     [leads],
-  )
+  );
 
   const patchLead = (id: string, patch: Partial<EstimateLead>) => {
-    setLeads((items) => items.map((item) => (item.id === id ? { ...item, ...patch } : item)))
-    setSelected((item) => (item && item.id === id ? { ...item, ...patch } : item))
-    setActionLead((item) => (item && item.id === id ? { ...item, ...patch } : item))
-  }
+    setLeads((items) =>
+      items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    );
+    setSelected((item) =>
+      item && item.id === id ? { ...item, ...patch } : item,
+    );
+    setActionLead((item) =>
+      item && item.id === id ? { ...item, ...patch } : item,
+    );
+  };
 
-  const changeStatus = async (lead: EstimateLead, status: EstimateLead["status"]) => {
-    const { error } = await supabase.from("estimate_leads").update({ status }).eq("id", lead.id)
-    if (error) return toast.error(`Could not update status: ${error.message}`)
-    patchLead(lead.id, { status })
-    toast.success("Status updated")
-  }
+  const changeStatus = async (
+    lead: EstimateLead,
+    status: EstimateLead["status"],
+  ) => {
+    if (lead.status === status) return;
+    const prevStatus = lead.status;
 
-  // --- CRM: ownership + remarks (JSON column on estimate_leads) ---
+    // 1. INSTANT optimistic update
+    patchLead(lead.id, { status });
 
-  const assignLead = async (lead: EstimateLead, userId: number | null) => {
-    setAssigning(true)
-    const { error } = await supabase.from("estimate_leads").update({ assigned_to: userId }).eq("id", lead.id)
-    setAssigning(false)
-    if (error) return toast.error(`Could not assign owner: ${error.message}`)
-    patchLead(lead.id, { assigned_to: userId })
-    toast.success(userId ? `Assigned to ${userNameById(users, userId) ?? "user"}` : "Owner cleared")
-  }
+    const { error } = await supabase
+      .from("estimate_leads")
+      .update({ status })
+      .eq("id", lead.id);
+    if (error) {
+      patchLead(lead.id, { status: prevStatus });
+      return toast.error(`Could not update status: ${error.message}`);
+    }
+    toast.success(`${lead.request_code} status updated to ${status}`);
+  };
+
+  // --- CRM: ownership + remarks ---
+
+  const assignLead = async (lead: EstimateLead, userId: string | null) => {
+    const prevOwner = lead.assigned_to;
+
+    // 1. INSTANT optimistic update
+    patchLead(lead.id, { assigned_to: userId });
+
+    setAssigning(true);
+    const targetUser = users.find(
+      (uq) => String(uq.adminLoginID) === String(userId),
+    );
+    const res = await assignLeadOwner({
+      table: "estimate_leads",
+      id: lead.id,
+      userId,
+      userName: targetUser?.username,
+      currentRemarks: lead.remarks ?? [],
+    });
+    setAssigning(false);
+
+    if (!res.success) {
+      patchLead(lead.id, { assigned_to: prevOwner });
+      return toast.error(
+        `Could not assign owner: ${res.error?.message || "Database error"}`,
+      );
+    }
+
+    if (res.remarks) {
+      patchLead(lead.id, { remarks: res.remarks });
+    }
+    toast.success(
+      userId
+        ? `Assigned to ${targetUser?.username || "user"}`
+        : "Owner cleared",
+    );
+  };
 
   const addLeadRemark = async (lead: EstimateLead, text: string) => {
-    const session = getSession()
+    const session = getSession();
     const remark: Remark = {
       id: crypto.randomUUID(),
       text,
       author: session?.username ?? "admin",
       createdAt: new Date().toISOString(),
-    }
-    const next = [...(lead.remarks ?? []), remark]
-    const { error } = await supabase.from("estimate_leads").update({ remarks: next }).eq("id", lead.id)
-    if (error) return toast.error(`Could not add remark: ${error.message}`)
-    patchLead(lead.id, { remarks: next })
-    toast.success("Remark added")
-  }
+    };
+    const next = [...(lead.remarks ?? []), remark];
+    const { error } = await supabase
+      .from("estimate_leads")
+      .update({ remarks: next })
+      .eq("id", lead.id);
+    if (error) return toast.error(`Could not add remark: ${error.message}`);
+    patchLead(lead.id, { remarks: next });
+    toast.success("Remark added");
+  };
 
   const deleteLeadRemark = async (lead: EstimateLead, remarkId: string) => {
-    const next = (lead.remarks ?? []).filter((r) => r.id !== remarkId)
-    const { error } = await supabase.from("estimate_leads").update({ remarks: next }).eq("id", lead.id)
-    if (error) return toast.error(`Could not delete remark: ${error.message}`)
-    patchLead(lead.id, { remarks: next })
-    toast.success("Remark deleted")
-  }
+    const next = (lead.remarks ?? []).filter((r) => r.id !== remarkId);
+    const { error } = await supabase
+      .from("estimate_leads")
+      .update({ remarks: next })
+      .eq("id", lead.id);
+    if (error) return toast.error(`Could not delete remark: ${error.message}`);
+    patchLead(lead.id, { remarks: next });
+    toast.success("Remark deleted");
+  };
 
-  // Permanently remove an estimate lead (permission-gated).
   const deleteLead = async (lead: EstimateLead) => {
-    // .select() lets us detect an RLS-silent block (success, 0 rows deleted).
     const { data, error } = await supabase
       .from("estimate_leads")
       .delete()
       .eq("id", lead.id)
-      .select("id")
+      .select("id");
 
-    if (error) return toast.error(`Could not delete: ${error.message}`)
+    if (error) return toast.error(`Could not delete: ${error.message}`);
     if (!data || data.length === 0) {
       return toast.error(
         "The database blocked the delete (row-level security has no delete policy for estimate leads). Nothing was deleted.",
-      )
+      );
     }
-    setLeads((items) => items.filter((item) => item.id !== lead.id))
-    setSelected(null)
-    setActionLead((curr) => (curr?.id === lead.id ? null : curr))
-    toast.success(`Deleted ${lead.request_code}`)
-  }
+    setLeads((items) => items.filter((item) => item.id !== lead.id));
+    setSelected(null);
+    setActionLead((curr) => (curr?.id === lead.id ? null : curr));
+    toast.success(`Deleted ${lead.request_code}`);
+  };
 
   const saveDetails = async () => {
-    if (!selected) return
-    setSavingDetails(true)
-    const quoted = draftQuote.trim() === "" ? null : Number(draftQuote)
-    if (quoted != null && Number.isNaN(quoted)) {
-      setSavingDetails(false)
-      return toast.error("Quoted amount must be a number")
-    }
-    const patch = { admin_notes: draftNotes.trim() || null, quoted_amount: quoted }
-    const { error } = await supabase.from("estimate_leads").update(patch).eq("id", selected.id)
-    setSavingDetails(false)
-    if (error) return toast.error(`Could not save: ${error.message}`)
-    patchLead(selected.id, patch)
-    toast.success("Lead updated")
-  }
+    if (!selected) return;
+    setSavingDetails(true);
+    const quoted = draftQuote.trim() === "" ? null : Number(draftQuote);
+    const notes = draftNotes.trim() === "" ? null : draftNotes.trim();
+    const { error } = await supabase
+      .from("estimate_leads")
+      .update({ quoted_amount: quoted, admin_notes: notes })
+      .eq("id", selected.id);
+    setSavingDetails(false);
+    if (error) return toast.error(`Could not save details: ${error.message}`);
+    patchLead(selected.id, { quoted_amount: quoted, admin_notes: notes });
+    toast.success("Saved admin notes & quote");
+  };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Estimate Leads</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Shipping estimate requests from the website. Verify the customer&apos;s code before sending a quotation.
+            Instantly manage and modify customer shipment estimates, status, and
+            assigned owners.
           </p>
         </div>
         <button
           onClick={loadLeads}
           disabled={loading}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-60"
+          className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-60"
         >
-          <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
+          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />{" "}
+          Refresh
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((card) => {
+          const Icon = card.icon;
           return (
-            <div key={stat.label} className="rounded-xl border bg-white p-4 shadow-sm">
-              <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${stat.tone}`}>
-                <Icon size={18} />
+            <div
+              key={card.label}
+              className="rounded-xl border bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-slate-500">
+                  {card.label}
+                </p>
+                <span className={`rounded-lg ${card.tone} p-2`}>
+                  <Icon size={18} />
+                </span>
               </div>
-              <p className="mt-3 text-2xl font-bold text-slate-900">{stat.value}</p>
-              <p className="mt-1 text-xs font-medium text-slate-500">{stat.label}</p>
+              <p className="mt-2 text-2xl font-bold text-slate-900">
+                {card.value}
+              </p>
             </div>
-          )
+          );
         })}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {(["all", ...STATUSES] as const).map((value) => (
-            <button
-              key={value}
-              onClick={() => setStatusFilter(value)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${
-                statusFilter === value ? "bg-slate-900 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200"
-              }`}
-            >
-              {value === "all" ? `All (${leads.length})` : value}
-            </button>
-          ))}
-        </div>
         <div className="relative w-full sm:w-72">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search code, name, phone, email…"
-            className="w-full rounded-lg border bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-slate-400"
+            placeholder="Search code, name, phone, country…"
+            className="w-full rounded-lg outline-none border bg-white py-2 pl-9 pr-3 text-sm focus:border-slate-400"
           />
+        </div>
+
+        <div className="flex wrap items-center gap-2">
+          <button
+            onClick={() => setStatusFilter("all")}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+              statusFilter === "all"
+                ? "bg-slate-900 text-white border-slate-900"
+                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            All
+          </button>
+          {STATUSES.map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+                statusFilter === s
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border bg-white">
-        <table className="w-full min-w-[860px] text-sm">
+      <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
+        <table className="w-full min-w-[960px] text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="p-3">Code</th>
@@ -279,13 +408,17 @@ export default function EstimateLeadsPage() {
               <th className="p-3">Status</th>
               <th className="p-3">Owner</th>
               <th className="p-3">Received</th>
-              <th className="p-3 text-right">Details</th>
+              <th className="p-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td className="p-6 text-center text-slate-500" colSpan={8}>
+                  <RefreshCw
+                    size={18}
+                    className="mr-2 inline animate-spin text-indigo-600"
+                  />{" "}
                   Loading estimate leads…
                 </td>
               </tr>
@@ -296,75 +429,149 @@ export default function EstimateLeadsPage() {
                 </td>
               </tr>
             ) : (
-              filtered.map((lead) => (
-                <tr key={lead.id} className="border-t align-top">
-                  <td className="p-3">
-                    <p className="font-mono text-xs font-semibold text-orange-600">{lead.request_code}</p>
-                  </td>
-                  <td className="p-3">
-                    <p className="font-medium">{lead.customer_name}</p>
-                    <p className="text-xs text-slate-500">{lead.destination_country}</p>
-                  </td>
-                  <td className="p-3">
-                    <p>{lead.whatsapp_number}</p>
-                    <p className="text-xs text-slate-500">{lead.email || "—"}</p>
-                  </td>
-                  <td className="p-3 text-xs">
-                    <p>{lead.package_type || "—"}</p>
-                    <p className="mt-1 text-slate-500">
-                      {lead.approx_weight_kg != null ? `${lead.approx_weight_kg} kg` : "—"}
-                      {lead.dimensions ? ` · ${lead.dimensions}` : ""}
-                    </p>
-                  </td>
-                  <td className="p-3">
-                    <select
-                      value={lead.status}
-                      onChange={(e) => changeStatus(lead, e.target.value as EstimateLead["status"])}
-                      className={`rounded-md px-2 py-1 text-xs font-semibold ring-1 ${statusTone[lead.status]}`}
-                    >
-                      {STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="p-3 text-xs text-slate-500">{new Date(lead.created_at).toLocaleString()}</td>
-                  <td className="p-3">
-                    {lead.assigned_to ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
-                        {userNameById(users, lead.assigned_to) ?? `#${lead.assigned_to}`}
-                      </span>
-                    ) : (
-                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
-                        Unassigned
-                      </span>
-                    )}
-                    {(lead.remarks?.length ?? 0) > 0 && (
-                      <p className="mt-1 text-[11px] text-slate-400">
-                        {lead.remarks?.length} remark{(lead.remarks?.length ?? 0) === 1 ? "" : "s"}
+              filtered.map((lead) => {
+                const waLink = buildWhatsAppLink(
+                  lead.whatsapp_number,
+                  `Hello ${lead.customer_name}, regarding your estimate request (${lead.request_code}) with Pick O Pick.`,
+                );
+                const gmailLink = buildGmailLink(
+                  lead.email,
+                  `Regarding Pick O Pick estimate request ${lead.request_code}`,
+                  `Hello ${lead.customer_name},\n\nRegarding your estimate request (${lead.request_code}) for shipping to ${lead.destination_country || ""}.\n\nPackage details:\n- Package: ${lead.package_type || "Standard"}\n- Weight: ${lead.approx_weight_kg != null ? `${lead.approx_weight_kg} kg` : "N/A"}\n- Dimensions: ${lead.dimensions || "N/A"}\n\nPlease let us know if you have any further questions.\n\nBest regards,\nPick O Pick Team`,
+                );
+
+                return (
+                  <tr
+                    key={lead.id}
+                    className="border-t align-middle hover:bg-slate-50/50"
+                  >
+                    <td className="p-3">
+                      <p className="font-mono text-xs font-semibold text-orange-600">
+                        {lead.request_code}
                       </p>
-                    )}
-                  </td>
-                  <td className="p-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => openLead(lead)}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                    </td>
+                    <td className="p-3">
+                      <p className="font-semibold text-slate-900">
+                        {lead.customer_name}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {lead.destination_country}
+                      </p>
+                    </td>
+                    <td className="p-3">
+                      <p className="text-xs font-medium text-slate-800">
+                        {lead.whatsapp_number}
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        {lead.email || "—"}
+                      </p>
+                    </td>
+                    <td className="p-3 text-xs">
+                      <p className="font-medium text-slate-800">
+                        {lead.package_type || "—"}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">
+                        {lead.approx_weight_kg != null
+                          ? `${lead.approx_weight_kg} kg`
+                          : "—"}
+                        {lead.dimensions ? ` · ${lead.dimensions}` : ""}
+                      </p>
+                    </td>
+                    <td className="p-3">
+                      <select
+                        value={lead.status}
+                        onChange={(e) =>
+                          changeStatus(
+                            lead,
+                            e.target.value as EstimateLead["status"],
+                          )
+                        }
+                        className={`rounded-md px-2 py-1 text-xs font-semibold ring-1 cursor-pointer ${statusTone[lead.status]}`}
                       >
-                        <Eye size={15} /> View
-                      </button>
-                      <button
-                        onClick={() => setActionLead(lead)}
-                        title="Assign owner & manage remarks"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"
-                      >
-                        <UserPlus size={15} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                        {STATUSES.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={lead.assigned_to ?? ""}
+                          onChange={(e) =>
+                            assignLead(lead, e.target.value || null)
+                          }
+                          disabled={assigning}
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800 outline-none hover:border-slate-300 focus:border-indigo-500"
+                        >
+                          <option value="">Unassigned</option>
+                          {users.map((u) => (
+                            <option key={u.adminLoginID} value={u.adminLoginID}>
+                              {u.username}
+                            </option>
+                          ))}
+                        </select>
+                        {lead.assigned_to && (
+                          <span
+                            title={`Owner: ${userNameById(users, lead.assigned_to) || "user"}`}
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold uppercase text-white"
+                          >
+                            {(userNameById(users, lead.assigned_to) || "U")[0]}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3 text-xs text-slate-500">
+                      {new Date(lead.created_at).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </td>
+                    <td className="p-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {waLink && (
+                          <a
+                            href={waLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Chat on WhatsApp"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+                          >
+                            <MessageCircle size={14} />
+                          </a>
+                        )}
+                        {gmailLink && (
+                          <a
+                            href={gmailLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Compose in Gmail (pre-filled)"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
+                          >
+                            <Mail size={14} />
+                          </a>
+                        )}
+                        <button
+                          onClick={() => openLead(lead)}
+                          title="View full details"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-indigo-700 hover:bg-indigo-50"
+                        >
+                          <Eye size={15} />
+                        </button>
+                        <button
+                          onClick={() => setActionLead(lead)}
+                          title="Manage remarks & follow-ups"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                        >
+                          <UserPlus size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -381,11 +588,17 @@ export default function EstimateLeadsPage() {
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-mono text-xs font-bold text-orange-600">{selected.request_code}</p>
-                <h2 className="mt-1 text-xl font-bold">{selected.customer_name}</h2>
+                <p className="font-mono text-xs font-bold text-orange-600">
+                  {selected.request_code}
+                </p>
+                <h2 className="mt-1 text-xl font-bold">
+                  {selected.customer_name}
+                </h2>
               </div>
               <div className="flex items-center gap-2">
-                {canDelete && <DeleteLeadButton onDelete={() => deleteLead(selected)} />}
+                {canDelete && (
+                  <DeleteLeadButton onDelete={() => deleteLead(selected)} />
+                )}
                 <button
                   onClick={() => setSelected(null)}
                   className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
@@ -396,10 +609,15 @@ export default function EstimateLeadsPage() {
             </div>
 
             <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-              <span className="font-bold text-slate-800">Verification code:</span>{" "}
-              <span className="font-mono font-bold text-orange-600">{selected.request_code}</span>
+              <span className="font-bold text-slate-800">
+                Verification code:
+              </span>{" "}
+              <span className="font-mono font-bold text-orange-600">
+                {selected.request_code}
+              </span>
               <span className="mx-2 text-slate-300">•</span>
-              <span className="font-bold text-slate-800">Status:</span> {selected.status}
+              <span className="font-bold text-slate-800">Status:</span>{" "}
+              {selected.status}
               <span className="mx-2 text-slate-300">•</span>
               Received {new Date(selected.created_at).toLocaleString()}
             </div>
@@ -410,21 +628,36 @@ export default function EstimateLeadsPage() {
               </h3>
               <div className="mt-3 grid grid-cols-1 gap-x-5 gap-y-3 text-sm sm:grid-cols-2">
                 <Field label="Customer name" value={selected.customer_name} />
-                <Field label="WhatsApp number" value={selected.whatsapp_number} />
+                <Field
+                  label="WhatsApp number"
+                  value={selected.whatsapp_number}
+                />
                 <Field label="Email ID" value={selected.email} />
-                <Field label="Destination country" value={selected.destination_country} />
+                <Field
+                  label="Destination country"
+                  value={selected.destination_country}
+                />
                 <Field label="Package type" value={selected.package_type} />
                 <Field
                   label="Approx. weight"
-                  value={selected.approx_weight_kg != null ? `${selected.approx_weight_kg} kg` : null}
+                  value={
+                    selected.approx_weight_kg != null
+                      ? `${selected.approx_weight_kg} kg`
+                      : null
+                  }
                 />
                 <Field label="Dimensions" value={selected.dimensions} />
-                <Field label="What they are shipping" value={selected.requirement_description} />
+                <Field
+                  label="What they are shipping"
+                  value={selected.requirement_description}
+                />
               </div>
             </section>
 
             <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Team working notes</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Team working notes
+              </h3>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_180px]">
                 <label className="text-xs font-semibold text-slate-600">
                   Admin notes
@@ -450,8 +683,13 @@ export default function EstimateLeadsPage() {
               <div className="mt-3 flex items-center gap-3">
                 <select
                   value={selected.status}
-                  onChange={(e) => changeStatus(selected, e.target.value as EstimateLead["status"])}
-                  className={`rounded-md px-2 py-1.5 text-xs font-semibold ring-1 ${statusTone[selected.status]}`}
+                  onChange={(e) =>
+                    changeStatus(
+                      selected,
+                      e.target.value as EstimateLead["status"],
+                    )
+                  }
+                  className={`rounded-md px-2 py-1.5 text-xs font-semibold ring-1 cursor-pointer ${statusTone[selected.status]}`}
                 >
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>
@@ -497,7 +735,8 @@ export default function EstimateLeadsPage() {
         statuses={STATUSES.map((s) => ({ value: s, label: s }))}
         status={actionLead?.status ?? "NEW"}
         onStatusChange={(status) =>
-          actionLead && changeStatus(actionLead, status as EstimateLead["status"])
+          actionLead &&
+          changeStatus(actionLead, status as EstimateLead["status"])
         }
         users={users}
         assignedTo={actionLead?.assigned_to ?? null}
@@ -505,24 +744,36 @@ export default function EstimateLeadsPage() {
         assigning={assigning}
         remarks={actionLead?.remarks ?? []}
         onAddRemark={(text) => actionLead && addLeadRemark(actionLead, text)}
-        onDeleteRemark={(remarkId) => actionLead && deleteLeadRemark(actionLead, remarkId)}
+        onDeleteRemark={(remarkId) =>
+          actionLead && deleteLeadRemark(actionLead, remarkId)
+        }
       >
         <section className="rounded-xl border border-slate-200 bg-white p-4">
           <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
             <Package size={14} /> Request details
           </h3>
           <div className="mt-3 grid grid-cols-1 gap-x-5 gap-y-3 text-sm sm:grid-cols-2">
-            <Field label="Destination country" value={actionLead?.destination_country} />
+            <Field
+              label="Destination country"
+              value={actionLead?.destination_country}
+            />
             <Field label="Package type" value={actionLead?.package_type} />
             <Field
               label="Approx. weight"
-              value={actionLead?.approx_weight_kg != null ? `${actionLead.approx_weight_kg} kg` : null}
+              value={
+                actionLead?.approx_weight_kg != null
+                  ? `${actionLead.approx_weight_kg} kg`
+                  : null
+              }
             />
             <Field label="Dimensions" value={actionLead?.dimensions} />
-            <Field label="What they are shipping" value={actionLead?.requirement_description} />
+            <Field
+              label="What they are shipping"
+              value={actionLead?.requirement_description}
+            />
           </div>
         </section>
       </LeadActionsDrawer>
     </div>
-  )
+  );
 }

@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   Clock,
@@ -14,47 +14,62 @@ import {
   Search,
   ShoppingBag,
   UserPlus,
-} from "lucide-react"
-import { supabase } from "@/lib/supabase"
-import { toast } from "sonner"
-import { getSession } from "@/lib/auth"
-import { useAuth } from "@/hooks/useAuth"
-import { canDeleteLeads } from "@/config/rolePermissions"
-import LeadActionsDrawer, { Remark } from "@/components/crm/LeadActionsDrawer"
-import DeleteLeadButton from "@/components/crm/DeleteLeadButton"
-import { useAssignableUsers, userNameById } from "@/components/crm/useAssignableUsers"
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+import { getSession } from "@/lib/auth";
+import { useAuth } from "@/hooks/useAuth";
+import { canDeleteLeads } from "@/config/rolePermissions";
+import LeadActionsDrawer, { Remark } from "@/components/crm/LeadActionsDrawer";
+import DeleteLeadButton from "@/components/crm/DeleteLeadButton";
+import {
+  useAssignableUsers,
+  userNameById,
+} from "@/components/crm/useAssignableUsers";
+import {
+  assignLeadOwner,
+  buildGmailLink,
+  buildWhatsAppLink,
+  resolveAssignedTo,
+} from "@/components/crm/crmHelpers";
 
 export type OrderItem = {
-  id: string
-  order_id: string
-  product_id: string | null
-  name: string
-  price: number
-  quantity: number
-  image: string | null
-  created_at?: string
-}
+  id: string;
+  order_id: string;
+  product_id: string | null;
+  name: string;
+  price: number;
+  quantity: number;
+  image: string | null;
+  created_at?: string;
+};
 
 export type QuoteOrder = {
-  id: string
-  order_code: string
-  customer_id: string | null
-  status: "QUOTE_REQUESTED" | "CONTACTED" | "QUOTED" | "COMPLETED" | "CANCELLED" | string
-  payment_status: "PENDING" | "PAID" | "FAILED" | string
-  payment_method: string | null
-  subtotal: number
-  shipping: number
-  tax: number
-  total: number
-  customer_name: string | null
-  customer_phone: string | null
-  customer_email: string | null
-  shipping_address: string | null
-  created_at: string
-  assigned_to?: number | null
-  remarks?: Remark[] | null
-  order_items?: OrderItem[]
-}
+  id: string;
+  order_code: string;
+  customer_id: string | null;
+  status:
+    | "QUOTE_REQUESTED"
+    | "CONTACTED"
+    | "QUOTED"
+    | "COMPLETED"
+    | "CANCELLED"
+    | string;
+  payment_status: "PENDING" | "PAID" | "FAILED" | string;
+  payment_method: string | null;
+  subtotal: number;
+  shipping: number;
+  tax: number;
+  total: number;
+  customer_name: string | null;
+  customer_phone: string | null;
+  customer_email: string | null;
+  shipping_address: string | null;
+  created_at: string;
+  assigned_to?: string | null;
+  remarks?: Remark[] | null;
+  order_items?: OrderItem[];
+};
 
 const STATUSES = [
   "QUOTE_REQUESTED",
@@ -62,15 +77,16 @@ const STATUSES = [
   "QUOTED",
   "COMPLETED",
   "CANCELLED",
-] as const
+] as const;
 
 const statusTone: Record<string, string> = {
   QUOTE_REQUESTED: "bg-amber-50 text-amber-800 ring-amber-200 border-amber-300",
   CONTACTED: "bg-blue-50 text-blue-800 ring-blue-200 border-blue-300",
   QUOTED: "bg-indigo-50 text-indigo-800 ring-indigo-200 border-indigo-300",
-  COMPLETED: "bg-emerald-50 text-emerald-800 ring-emerald-200 border-emerald-300",
+  COMPLETED:
+    "bg-emerald-50 text-emerald-800 ring-emerald-200 border-emerald-300",
   CANCELLED: "bg-slate-100 text-slate-700 ring-slate-200 border-slate-300",
-}
+};
 
 const statusLabels: Record<string, string> = {
   QUOTE_REQUESTED: "Quote Requested",
@@ -78,184 +94,214 @@ const statusLabels: Record<string, string> = {
   QUOTED: "Quoted",
   COMPLETED: "Completed / Order Placed",
   CANCELLED: "Cancelled",
-}
+};
 
 export default function QuotesPage() {
-  const [quotes, setQuotes] = useState<QuoteOrder[]>([])
-  const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedQuote, setSelectedQuote] = useState<QuoteOrder | null>(null)
-  const [actionQuote, setActionQuote] = useState<QuoteOrder | null>(null)
-  const [assigning, setAssigning] = useState(false)
-  const { users } = useAssignableUsers()
-  const { role, session } = useAuth()
-  const canDelete = canDeleteLeads(role, session?.permissions)
+  const [quotes, setQuotes] = useState<QuoteOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedQuote, setSelectedQuote] = useState<QuoteOrder | null>(null);
+  const [actionQuote, setActionQuote] = useState<QuoteOrder | null>(null);
+  const [assigning, setAssigning] = useState(false);
+  const { users } = useAssignableUsers();
+  const { role, session } = useAuth();
+  const canDelete = canDeleteLeads(role, session?.permissions);
 
   // Edit states inside modal
-  const [editStatus, setEditStatus] = useState<string>("QUOTE_REQUESTED")
-  const [editSubtotal, setEditSubtotal] = useState<string>("0")
-  const [editShipping, setEditShipping] = useState<string>("0")
-  const [editTax, setEditTax] = useState<string>("0")
-  const [editTotal, setEditTotal] = useState<string>("0")
-  const [itemPrices, setItemPrices] = useState<Record<string, string>>({})
-  const [isSaving, setIsSaving] = useState(false)
+  const [editStatus, setEditStatus] = useState<string>("QUOTE_REQUESTED");
+  const [editSubtotal, setEditSubtotal] = useState<string>("0");
+  const [editShipping, setEditShipping] = useState<string>("0");
+  const [editTax, setEditTax] = useState<string>("0");
+  const [editTotal, setEditTotal] = useState<string>("0");
+  const [itemPrices, setItemPrices] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const loadQuotes = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from("orders")
         .select("*, order_items(*)")
-        .order("created_at", { ascending: false })
+        .order("created_at", { ascending: false });
 
       if (error) {
-        toast.error(`Unable to load quote requests: ${error.message}`)
+        toast.error(`Unable to load quote requests: ${error.message}`);
       } else {
-        setQuotes((data || []) as QuoteOrder[])
+        setQuotes(
+          (data || []).map((row: any) => ({
+            ...row,
+            assigned_to: resolveAssignedTo(row),
+          })),
+        );
       }
     } catch (err: any) {
-      toast.error(`Failed loading quotes: ${err?.message || err}`)
+      toast.error(`Failed loading quotes: ${err?.message || err}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    loadQuotes()
-  }, [])
+    loadQuotes();
+  }, []);
 
   const openModal = (quote: QuoteOrder) => {
-    setSelectedQuote(quote)
-    setEditStatus(quote.status || "QUOTE_REQUESTED")
-    setEditSubtotal(String(quote.subtotal || 0))
-    setEditShipping(String(quote.shipping || 0))
-    setEditTax(String(quote.tax || 0))
-    setEditTotal(String(quote.total || 0))
+    setSelectedQuote(quote);
+    setEditStatus(quote.status || "QUOTE_REQUESTED");
+    setEditSubtotal(String(quote.subtotal || 0));
+    setEditShipping(String(quote.shipping || 0));
+    setEditTax(String(quote.tax || 0));
+    setEditTotal(String(quote.total || 0));
 
-    const prices: Record<string, string> = {}
+    const prices: Record<string, string> = {};
     quote.order_items?.forEach((item) => {
-      prices[item.id] = String(item.price || 0)
-    })
-    setItemPrices(prices)
-  }
+      prices[item.id] = String(item.price || 0);
+    });
+    setItemPrices(prices);
+  };
 
   const patchLocalQuote = (id: string, patch: Partial<QuoteOrder>) => {
     setQuotes((prev) =>
-      prev.map((q) => (q.id === id ? { ...q, ...patch } : q))
-    )
-    setSelectedQuote((curr) => (curr && curr.id === id ? { ...curr, ...patch } : curr))
-  }
+      prev.map((q) => (q.id === id ? { ...q, ...patch } : q)),
+    );
+    setSelectedQuote((curr) =>
+      curr && curr.id === id ? { ...curr, ...patch } : curr,
+    );
+    setActionQuote((curr) =>
+      curr && curr.id === id ? { ...curr, ...patch } : curr,
+    );
+  };
 
   const changeStatusQuick = async (quote: QuoteOrder, newStatus: string) => {
+    if (quote.status === newStatus) return;
+    const prevStatus = quote.status;
+
+    // 1. INSTANT optimistic update
+    patchLocalQuote(quote.id, { status: newStatus });
+
     try {
       const { error } = await supabase
         .from("orders")
         .update({ status: newStatus })
-        .eq("id", quote.id)
+        .eq("id", quote.id);
 
-      if (error) throw error
-      patchLocalQuote(quote.id, { status: newStatus })
-      toast.success(`Status updated to ${statusLabels[newStatus] || newStatus}`)
+      if (error) throw error;
+      toast.success(
+        `Status updated to ${statusLabels[newStatus] || newStatus}`,
+      );
     } catch (err: any) {
-      toast.error(`Could not update status: ${err?.message || err}`)
+      patchLocalQuote(quote.id, { status: prevStatus });
+      toast.error(`Could not update status: ${err?.message || err}`);
     }
-  }
+  };
 
-  // --- CRM: ownership + remarks (stored as JSON on the order row) ---
+  // --- CRM: ownership + remarks ---
 
-  const patchCrmFields = (id: string, patch: Partial<QuoteOrder>) => {
-    patchLocalQuote(id, patch)
-    setActionQuote((curr) => (curr && curr.id === id ? { ...curr, ...patch } : curr))
-  }
+  const assignQuote = async (quote: QuoteOrder, userId: string | null) => {
+    const prevOwner = quote.assigned_to;
 
-  const assignQuote = async (quote: QuoteOrder, userId: number | null) => {
-    setAssigning(true)
-    const { error } = await supabase
-      .from("orders")
-      .update({ assigned_to: userId })
-      .eq("id", quote.id)
-    setAssigning(false)
+    // 1. INSTANT optimistic update
+    patchLocalQuote(quote.id, { assigned_to: userId });
 
-    if (error) return toast.error(`Could not assign owner: ${error.message}`)
-    patchCrmFields(quote.id, { assigned_to: userId })
+    setAssigning(true);
+    const targetUser = users.find(
+      (uq) => String(uq.adminLoginID) === String(userId),
+    );
+    const res = await assignLeadOwner({
+      table: "orders",
+      id: quote.id,
+      userId,
+      userName: targetUser?.username,
+      currentRemarks: quote.remarks ?? [],
+    });
+    setAssigning(false);
+
+    if (!res.success) {
+      patchLocalQuote(quote.id, { assigned_to: prevOwner });
+      return toast.error(
+        `Could not assign owner: ${res.error?.message || "Database error"}`,
+      );
+    }
+
+    if (res.remarks) {
+      patchLocalQuote(quote.id, { remarks: res.remarks });
+    }
     toast.success(
       userId
-        ? `Assigned to ${userNameById(users, userId) ?? "user"}`
+        ? `Assigned to ${targetUser?.username || "user"}`
         : "Owner cleared",
-    )
-  }
+    );
+  };
 
   const addQuoteRemark = async (quote: QuoteOrder, text: string) => {
-    const session = getSession()
+    const session = getSession();
     const remark: Remark = {
       id: crypto.randomUUID(),
       text,
       author: session?.username ?? "admin",
       createdAt: new Date().toISOString(),
-    }
-    const next = [...(quote.remarks ?? []), remark]
+    };
+    const next = [...(quote.remarks ?? []), remark];
     const { error } = await supabase
       .from("orders")
       .update({ remarks: next })
-      .eq("id", quote.id)
+      .eq("id", quote.id);
 
-    if (error) return toast.error(`Could not add remark: ${error.message}`)
-    patchCrmFields(quote.id, { remarks: next })
-    toast.success("Remark added")
-  }
+    if (error) return toast.error(`Could not add remark: ${error.message}`);
+    patchLocalQuote(quote.id, { remarks: next });
+    toast.success("Remark added");
+  };
 
   const deleteQuoteRemark = async (quote: QuoteOrder, remarkId: string) => {
-    const next = (quote.remarks ?? []).filter((r) => r.id !== remarkId)
+    const next = (quote.remarks ?? []).filter((r) => r.id !== remarkId);
     const { error } = await supabase
       .from("orders")
       .update({ remarks: next })
-      .eq("id", quote.id)
+      .eq("id", quote.id);
 
-    if (error) return toast.error(`Could not delete remark: ${error.message}`)
-    patchCrmFields(quote.id, { remarks: next })
-    toast.success("Remark deleted")
-  }
+    if (error) return toast.error(`Could not delete remark: ${error.message}`);
+    patchLocalQuote(quote.id, { remarks: next });
+    toast.success("Remark deleted");
+  };
 
   // Permanently remove a quote request and its items (permission-gated).
   const deleteQuote = async (quote: QuoteOrder) => {
     try {
-      // Items reference the order — clear them first to avoid FK errors.
-      await supabase.from("order_items").delete().eq("order_id", quote.id)
-      // .select() lets us detect an RLS-silent block (success, 0 rows deleted).
+      await supabase.from("order_items").delete().eq("order_id", quote.id);
       const { data, error } = await supabase
         .from("orders")
         .delete()
         .eq("id", quote.id)
-        .select("id")
+        .select("id");
 
-      if (error) throw error
+      if (error) throw error;
       if (!data || data.length === 0) {
         toast.error(
           "The database blocked the delete (row-level security has no delete policy for quote requests). Nothing was deleted.",
-        )
-        return
+        );
+        return;
       }
 
-      setQuotes((prev) => prev.filter((q) => q.id !== quote.id))
-      setSelectedQuote(null)
-      setActionQuote((curr) => (curr?.id === quote.id ? null : curr))
-      toast.success(`Deleted ${quote.order_code}`)
+      setQuotes((prev) => prev.filter((q) => q.id !== quote.id));
+      setSelectedQuote(null);
+      setActionQuote((curr) => (curr?.id === quote.id ? null : curr));
+      toast.success(`Deleted ${quote.order_code}`);
     } catch (err: any) {
-      toast.error(`Could not delete: ${err?.message || err}`)
+      toast.error(`Could not delete: ${err?.message || err}`);
     }
-  }
+  };
 
   const saveQuoteChanges = async () => {
-    if (!selectedQuote) return
-    setIsSaving(true)
+    if (!selectedQuote) return;
+    setIsSaving(true);
     try {
-      const subtotalNum = parseFloat(editSubtotal) || 0
-      const shippingNum = parseFloat(editShipping) || 0
-      const taxNum = parseFloat(editTax) || 0
-      const totalNum = parseFloat(editTotal) || (subtotalNum + shippingNum + taxNum)
+      const subtotalNum = parseFloat(editSubtotal) || 0;
+      const shippingNum = parseFloat(editShipping) || 0;
+      const taxNum = parseFloat(editTax) || 0;
+      const totalNum =
+        parseFloat(editTotal) || subtotalNum + shippingNum + taxNum;
 
-      // 1. Update orders table
       const { error: orderError } = await supabase
         .from("orders")
         .update({
@@ -265,19 +311,18 @@ export default function QuotesPage() {
           tax: taxNum,
           total: totalNum,
         })
-        .eq("id", selectedQuote.id)
+        .eq("id", selectedQuote.id);
 
-      if (orderError) throw orderError
+      if (orderError) throw orderError;
 
-      // 2. Update item prices if modified
       if (selectedQuote.order_items && selectedQuote.order_items.length > 0) {
         for (const item of selectedQuote.order_items) {
-          const newPrice = parseFloat(itemPrices[item.id]) || 0
+          const newPrice = parseFloat(itemPrices[item.id]) || 0;
           if (newPrice !== item.price) {
             await supabase
               .from("order_items")
               .update({ price: newPrice })
-              .eq("id", item.id)
+              .eq("id", item.id);
           }
         }
       }
@@ -288,47 +333,49 @@ export default function QuotesPage() {
         shipping: shippingNum,
         tax: taxNum,
         total: totalNum,
-      })
+      });
 
-      toast.success("Quote details updated successfully!")
-      loadQuotes()
+      toast.success("Quote details updated successfully!");
+      loadQuotes();
     } catch (err: any) {
-      toast.error(`Failed to save: ${err?.message || err}`)
+      toast.error(`Failed to save: ${err?.message || err}`);
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
-  // Filtered quotes
   const filteredQuotes = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    return quotes.filter((item) => {
-      if (statusFilter !== "all" && item.status !== statusFilter) return false
-      if (!q) return true
+    return quotes.filter((q) => {
+      const matchesStatus =
+        statusFilter === "all" ? true : q.status === statusFilter;
 
-      const matchCode = item.order_code?.toLowerCase().includes(q)
-      const matchName = item.customer_name?.toLowerCase().includes(q)
-      const matchEmail = item.customer_email?.toLowerCase().includes(q)
-      const matchPhone = item.customer_phone?.includes(q)
-      const matchItems = item.order_items?.some((i) =>
-        i.name?.toLowerCase().includes(q)
-      )
+      if (!matchesStatus) return false;
 
-      return matchCode || matchName || matchEmail || matchPhone || matchItems
-    })
-  }, [quotes, statusFilter, searchQuery])
+      if (!searchQuery.trim()) return true;
+      const qLower = searchQuery.toLowerCase();
 
-  // Summary KPI statistics
+      const matchCode = q.order_code?.toLowerCase().includes(qLower);
+      const matchName = q.customer_name?.toLowerCase().includes(qLower);
+      const matchPhone = q.customer_phone?.toLowerCase().includes(qLower);
+      const matchEmail = q.customer_email?.toLowerCase().includes(qLower);
+      const matchProduct = q.order_items?.some((item) =>
+        item.name.toLowerCase().includes(qLower),
+      );
+
+      return matchCode || matchName || matchPhone || matchEmail || matchProduct;
+    });
+  }, [quotes, statusFilter, searchQuery]);
+
   const stats = useMemo(() => {
     return [
       {
-        label: "Total Quote Requests",
+        label: "Total Requests",
         value: quotes.length,
         icon: ShoppingBag,
         color: "bg-slate-900 text-white",
       },
       {
-        label: "Awaiting Quote",
+        label: "Quote Requested",
         value: quotes.filter((q) => q.status === "QUOTE_REQUESTED").length,
         icon: Clock,
         color: "bg-amber-50 text-amber-700",
@@ -351,29 +398,20 @@ export default function QuotesPage() {
         icon: CheckCircle2,
         color: "bg-emerald-50 text-emerald-700",
       },
-    ]
-  }, [quotes])
-
-  const getWhatsAppLink = (quote: QuoteOrder) => {
-    const cleanPhone = (quote.customer_phone || "").replace(/\D/g, "")
-    const fullPhone = cleanPhone.startsWith("91")
-      ? cleanPhone
-      : cleanPhone.length === 10
-      ? `91${cleanPhone}`
-      : cleanPhone
-
-    const message = `Hello ${quote.customer_name || "Customer"}, regarding your Pick O Pick product quote request (${quote.order_code}). We have reviewed your items and have an update for you.`
-    return `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`
-  }
+    ];
+  }, [quotes]);
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Product Quote Requests</h1>
+          <h1 className="text-2xl font-bold text-slate-900">
+            Product Quote Requests
+          </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Real-time table of customer cart quote requests, product lists, quantities, and contact details.
+            Real-time table of customer cart quote requests, product lists,
+            quantities, and contact details.
           </p>
         </div>
         <button
@@ -389,16 +427,25 @@ export default function QuotesPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((s) => {
-          const Icon = s.icon
+          const Icon = s.icon;
           return (
-            <div key={s.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${s.color}`}>
+            <div
+              key={s.label}
+              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <div
+                className={`flex h-9 w-9 items-center justify-center rounded-lg ${s.color}`}
+              >
                 <Icon size={18} />
               </div>
-              <p className="mt-3 text-2xl font-bold text-slate-900">{s.value}</p>
-              <p className="mt-1 text-xs font-medium text-slate-500">{s.label}</p>
+              <p className="mt-3 text-2xl font-bold text-slate-900">
+                {s.value}
+              </p>
+              <p className="mt-1 text-xs font-medium text-slate-500">
+                {s.label}
+              </p>
             </div>
-          )
+          );
         })}
       </div>
 
@@ -416,7 +463,7 @@ export default function QuotesPage() {
             All ({quotes.length})
           </button>
           {STATUSES.map((st) => {
-            const count = quotes.filter((q) => q.status === st).length
+            const count = quotes.filter((q) => q.status === st).length;
             return (
               <button
                 key={st}
@@ -429,7 +476,7 @@ export default function QuotesPage() {
               >
                 {statusLabels[st] || st} ({count})
               </button>
-            )
+            );
           })}
         </div>
 
@@ -469,7 +516,10 @@ export default function QuotesPage() {
               <tr>
                 <td colSpan={9} className="p-8 text-center text-slate-500">
                   <div className="flex items-center justify-center gap-2">
-                    <RefreshCw size={18} className="animate-spin text-indigo-600" />
+                    <RefreshCw
+                      size={18}
+                      className="animate-spin text-indigo-600"
+                    />
                     <span>Loading quote requests...</span>
                   </div>
                 </td>
@@ -478,7 +528,9 @@ export default function QuotesPage() {
               <tr>
                 <td colSpan={9} className="p-10 text-center text-slate-500">
                   <ShoppingBag className="mx-auto mb-3 h-10 w-10 text-slate-300" />
-                  <p className="font-semibold text-slate-700">No quote requests found</p>
+                  <p className="font-semibold text-slate-700">
+                    No quote requests found
+                  </p>
                   <p className="mt-1 text-xs text-slate-400">
                     {searchQuery
                       ? "Try clearing your search query"
@@ -489,12 +541,28 @@ export default function QuotesPage() {
             ) : (
               filteredQuotes.map((quote) => {
                 const totalUnits =
-                  quote.order_items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0
+                  quote.order_items?.reduce(
+                    (sum, item) => sum + (item.quantity || 1),
+                    0,
+                  ) || 0;
+
+                const waLink = buildWhatsAppLink(
+                  quote.customer_phone,
+                  `Hello ${quote.customer_name || "Customer"}, regarding your Pick O Pick product quote request (${quote.order_code}). We have reviewed your items and have an update for you.`,
+                );
+                const gmailLink = buildGmailLink(
+                  quote.customer_email,
+                  `Regarding Pick O Pick Quote Request ${quote.order_code}`,
+                  `Hello ${quote.customer_name || "Customer"},\n\nRegarding your cart quote request (${quote.order_code}).\n\nItems in your request:\n${(quote.order_items || []).map((i) => `- ${i.name} (Qty: ${i.quantity})`).join("\n")}\n\nPlease let us know if you need any assistance.\n\nBest regards,\nPick O Pick Team`,
+                );
 
                 return (
-                  <tr key={quote.id} className="transition hover:bg-slate-50/70">
+                  <tr
+                    key={quote.id}
+                    className="transition hover:bg-slate-50/70"
+                  >
                     {/* Code */}
-                    <td className="p-3.5 align-top">
+                    <td className="p-3.5 align-middle">
                       <span className="font-mono text-xs font-bold text-[#0B56D9]">
                         {quote.order_code}
                       </span>
@@ -504,7 +572,7 @@ export default function QuotesPage() {
                     </td>
 
                     {/* Customer */}
-                    <td className="p-3.5 align-top">
+                    <td className="p-3.5 align-middle">
                       <p className="font-semibold text-slate-900">
                         {quote.customer_name || "Guest Customer"}
                       </p>
@@ -521,10 +589,13 @@ export default function QuotesPage() {
                     </td>
 
                     {/* Products Preview */}
-                    <td className="p-3.5 align-top">
+                    <td className="p-3.5 align-middle">
                       <div className="flex flex-col gap-1.5 max-w-[280px]">
                         {(quote.order_items || []).slice(0, 3).map((item) => (
-                          <div key={item.id} className="flex items-center gap-2">
+                          <div
+                            key={item.id}
+                            className="flex items-center gap-2"
+                          >
                             {item.image ? (
                               <img
                                 src={item.image}
@@ -537,7 +608,10 @@ export default function QuotesPage() {
                               </div>
                             )}
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs font-medium text-slate-800" title={item.name}>
+                              <p
+                                className="truncate text-xs font-medium text-slate-800"
+                                title={item.name}
+                              >
                                 {item.name}
                               </p>
                             </div>
@@ -548,26 +622,30 @@ export default function QuotesPage() {
                         ))}
                         {(quote.order_items || []).length > 3 && (
                           <p className="text-[11px] font-semibold text-indigo-600">
-                            +{(quote.order_items || []).length - 3} more product(s)
+                            +{(quote.order_items || []).length - 3} more
+                            product(s)
                           </p>
                         )}
                       </div>
                     </td>
 
                     {/* Total Units */}
-                    <td className="p-3.5 align-top">
+                    <td className="p-3.5 align-middle">
                       <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                         {totalUnits} {totalUnits === 1 ? "unit" : "units"}
                       </span>
                     </td>
 
                     {/* Status with inline selector */}
-                    <td className="p-3.5 align-top">
+                    <td className="p-3.5 align-middle">
                       <select
                         value={quote.status}
-                        onChange={(e) => changeStatusQuick(quote, e.target.value)}
+                        onChange={(e) =>
+                          changeStatusQuick(quote, e.target.value)
+                        }
                         className={`rounded-lg border px-2.5 py-1 text-xs font-bold outline-none ring-1 transition cursor-pointer ${
-                          statusTone[quote.status] || "bg-slate-100 text-slate-800 ring-slate-200 border-slate-300"
+                          statusTone[quote.status] ||
+                          "bg-slate-100 text-slate-800 ring-slate-200 border-slate-300"
                         }`}
                       >
                         {STATUSES.map((st) => (
@@ -579,28 +657,42 @@ export default function QuotesPage() {
                     </td>
 
                     {/* Owner */}
-                    <td className="p-3.5 align-top">
-                      {quote.assigned_to ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold uppercase text-white">
-                            {(userNameById(users, quote.assigned_to) ?? "?")[0]}
+                    <td className="p-3.5 align-middle">
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={quote.assigned_to ?? ""}
+                          onChange={(e) =>
+                            assignQuote(quote, e.target.value || null)
+                          }
+                          disabled={assigning}
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800 outline-none hover:border-slate-300 focus:border-indigo-500"
+                        >
+                          <option value="">Unassigned</option>
+                          {users.map((u) => (
+                            <option key={u.adminLoginID} value={u.adminLoginID}>
+                              {u.username}
+                            </option>
+                          ))}
+                        </select>
+                        {quote.assigned_to && (
+                          <span
+                            title={`Owner: ${userNameById(users, quote.assigned_to) || "user"}`}
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold uppercase text-white"
+                          >
+                            {(userNameById(users, quote.assigned_to) || "U")[0]}
                           </span>
-                          {userNameById(users, quote.assigned_to) ?? `#${quote.assigned_to}`}
-                        </span>
-                      ) : (
-                        <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
-                          Unassigned
-                        </span>
-                      )}
+                        )}
+                      </div>
                       {(quote.remarks?.length ?? 0) > 0 && (
                         <p className="mt-1 text-[11px] text-slate-400">
-                          {quote.remarks?.length} remark{(quote.remarks?.length ?? 0) === 1 ? "" : "s"}
+                          {quote.remarks?.length} remark
+                          {(quote.remarks?.length ?? 0) === 1 ? "" : "s"}
                         </p>
                       )}
                     </td>
 
                     {/* Quoted Total */}
-                    <td className="p-3.5 align-top">
+                    <td className="p-3.5 align-middle">
                       {quote.total > 0 ? (
                         <p className="font-semibold text-slate-900">
                           ₹{quote.total.toLocaleString("en-IN")}
@@ -613,52 +705,66 @@ export default function QuotesPage() {
                     </td>
 
                     {/* Date */}
-                    <td className="p-3.5 align-top text-xs text-slate-500">
+                    <td className="p-3.5 align-middle text-xs text-slate-500">
                       {new Date(quote.created_at).toLocaleDateString("en-IN", {
                         day: "numeric",
                         month: "short",
                         year: "numeric",
                       })}
                       <p className="mt-0.5 text-[11px] text-slate-400">
-                        {new Date(quote.created_at).toLocaleTimeString("en-IN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {new Date(quote.created_at).toLocaleTimeString(
+                          "en-IN",
+                          {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )}
                       </p>
                     </td>
 
                     {/* Actions */}
-                    <td className="p-3.5 align-top text-right">
+                    <td className="p-3.5 align-middle text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        {quote.customer_phone && (
+                        {waLink && (
                           <a
-                            href={getWhatsAppLink(quote)}
+                            href={waLink}
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
                             title="Chat with customer on WhatsApp"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
                           >
-                            <MessageCircle size={15} />
+                            <MessageCircle size={14} />
+                          </a>
+                        )}
+                        {gmailLink && (
+                          <a
+                            href={gmailLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Compose in Gmail (pre-filled)"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
+                          >
+                            <Mail size={14} />
                           </a>
                         )}
                         <button
                           onClick={() => openModal(quote)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                          className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
                         >
-                          <Eye size={14} />
+                          <Eye size={13} />
                           View
                         </button>
                         <button
                           onClick={() => setActionQuote(quote)}
                           title="Assign owner & manage remarks"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-indigo-300 hover:text-indigo-600"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-indigo-300 hover:text-indigo-600"
                         >
-                          <UserPlus size={15} />
+                          <UserPlus size={14} />
                         </button>
                       </div>
                     </td>
                   </tr>
-                )
+                );
               })
             )}
           </tbody>
@@ -678,408 +784,327 @@ export default function QuotesPage() {
             {/* Modal Header */}
             <div className="flex items-start justify-between border-b border-slate-100 pb-4">
               <div>
-                <span className="font-mono text-xs font-bold text-[#0B56D9]">
-                  {selectedQuote.order_code}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm font-bold text-[#0B56D9]">
+                    {selectedQuote.order_code}
+                  </span>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ${
+                      statusTone[selectedQuote.status] ||
+                      "bg-slate-100 text-slate-800"
+                    }`}
+                  >
+                    {statusLabels[selectedQuote.status] || selectedQuote.status}
+                  </span>
+                </div>
                 <h2 className="mt-1 text-xl font-bold text-slate-900">
-                  {selectedQuote.customer_name || "Customer Quote Request"}
+                  {selectedQuote.customer_name || "Guest Customer"}
                 </h2>
                 <p className="text-xs text-slate-400">
-                  Requested on {new Date(selectedQuote.created_at).toLocaleString("en-IN")}
+                  Requested on{" "}
+                  {new Date(selectedQuote.created_at).toLocaleString("en-IN")}
                 </p>
               </div>
+
               <div className="flex items-center gap-2">
-                {canDelete && selectedQuote && (
-                  <DeleteLeadButton onDelete={() => deleteQuote(selectedQuote)} />
+                {canDelete && (
+                  <DeleteLeadButton
+                    onDelete={() => deleteQuote(selectedQuote)}
+                  />
                 )}
                 <button
                   onClick={() => setSelectedQuote(null)}
-                  className="cursor-pointer rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                 >
-                  ✕
+                  Close
                 </button>
               </div>
             </div>
 
-            {/* Modal Body */}
-            <div className="mt-5 space-y-6">
-              {/* Customer Contact Card */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                    Customer Information
-                  </h3>
-                  <div className="flex gap-2">
-                    {selectedQuote.customer_phone && (
-                      <a
-                        href={getWhatsAppLink(selectedQuote)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white transition hover:bg-emerald-700"
-                      >
-                        <MessageCircle size={14} />
-                        WhatsApp Customer
-                      </a>
-                    )}
-                    {selectedQuote.customer_email && (
-                      <a
-                        href={`mailto:${selectedQuote.customer_email}?subject=Regarding Pick O Pick Quote Request ${selectedQuote.order_code}`}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-700 transition hover:bg-slate-300"
-                      >
-                        <Mail size={14} />
-                        Email
-                      </a>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3 text-sm">
-                  <div>
-                    <span className="text-[11px] font-medium text-slate-400">Full Name</span>
-                    <p className="font-semibold text-slate-800">{selectedQuote.customer_name || "—"}</p>
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-medium text-slate-400">Phone Number</span>
-                    <p className="font-semibold text-slate-800">{selectedQuote.customer_phone || "—"}</p>
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-medium text-slate-400">Email Address</span>
-                    <p className="font-semibold text-slate-800">{selectedQuote.customer_email || "—"}</p>
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-medium text-slate-400">Customer ID</span>
-                    <p className="font-mono text-xs font-medium text-slate-600">
-                      {selectedQuote.customer_id || "—"}
-                    </p>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <span className="text-[11px] font-medium text-slate-400">Shipping Address</span>
-                    <p className="font-medium text-slate-800">{selectedQuote.shipping_address || "Not specified"}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Products Table */}
-              <div>
-                <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Products Selected by Customer ({(selectedQuote.order_items || []).length})
+            {/* Customer & Shipping Info */}
+            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Customer Information
                 </h3>
-                <div className="overflow-hidden rounded-xl border border-slate-200">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                      <tr>
-                        <th className="p-3">Product</th>
-                        <th className="p-3 text-center">Quantity</th>
-                        <th className="p-3 text-right">Item Price (₹)</th>
-                        <th className="p-3 text-right">Line Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {(selectedQuote.order_items || []).map((item) => {
-                        const unitPrice = parseFloat(itemPrices[item.id] || "0") || 0
-                        const lineTotal = unitPrice * (item.quantity || 1)
-
-                        return (
-                          <tr key={item.id} className="hover:bg-slate-50/50">
-                            <td className="p-3">
-                              <div className="flex items-center gap-3">
-                                {item.image ? (
-                                  <img
-                                    src={item.image}
-                                    alt={item.name}
-                                    className="h-12 w-12 rounded-lg object-cover border border-slate-200 shrink-0"
-                                  />
-                                ) : (
-                                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-slate-400 shrink-0">
-                                    <Package size={20} />
-                                  </div>
-                                )}
-                                <div>
-                                  <p className="font-semibold text-slate-900">{item.name}</p>
-                                  {item.product_id && (
-                                    <p className="font-mono text-[10px] text-slate-400">
-                                      ID: {item.product_id}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-3 text-center font-bold text-slate-800">
-                              {item.quantity}
-                            </td>
-                            <td className="p-3 text-right">
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={itemPrices[item.id] ?? "0"}
-                                onChange={(e) => {
-                                  const val = e.target.value
-                                  setItemPrices((prev) => ({ ...prev, [item.id]: val }))
-                                  // Auto-calculate subtotal
-                                  const newPrices = { ...itemPrices, [item.id]: val }
-                                  let newSub = 0
-                                  selectedQuote.order_items?.forEach((it) => {
-                                    const p = parseFloat(newPrices[it.id] || "0") || 0
-                                    newSub += p * (it.quantity || 1)
-                                  })
-                                  setEditSubtotal(String(newSub))
-                                  const ship = parseFloat(editShipping) || 0
-                                  const tax = parseFloat(editTax) || 0
-                                  setEditTotal(String(newSub + ship + tax))
-                                }}
-                                className="w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-sm font-semibold outline-none focus:border-indigo-600"
-                              />
-                            </td>
-                            <td className="p-3 text-right font-bold text-slate-900">
-                              ₹{lineTotal.toLocaleString("en-IN")}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Financial Breakdown & Status Form */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Quote Pricing & Status Administration
-                </h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                      Lead / Quote Status
-                    </label>
-                    <select
-                      value={editStatus}
-                      onChange={(e) => setEditStatus(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-600"
-                    >
-                      {STATUSES.map((st) => (
-                        <option key={st} value={st}>
-                          {statusLabels[st] || st}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                      Products Subtotal (₹)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={editSubtotal}
-                      onChange={(e) => {
-                        setEditSubtotal(e.target.value)
-                        const sub = parseFloat(e.target.value) || 0
-                        const ship = parseFloat(editShipping) || 0
-                        const tax = parseFloat(editTax) || 0
-                        setEditTotal(String(sub + ship + tax))
-                      }}
-                      className="w-full rounded-lg border border-slate-300 bg-white p-2 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                      International Shipping (₹)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={editShipping}
-                      onChange={(e) => {
-                        setEditShipping(e.target.value)
-                        const sub = parseFloat(editSubtotal) || 0
-                        const ship = parseFloat(e.target.value) || 0
-                        const tax = parseFloat(editTax) || 0
-                        setEditTotal(String(sub + ship + tax))
-                      }}
-                      className="w-full rounded-lg border border-slate-300 bg-white p-2 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                      Packaging / Tax (₹)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={editTax}
-                      onChange={(e) => {
-                        setEditTax(e.target.value)
-                        const sub = parseFloat(editSubtotal) || 0
-                        const ship = parseFloat(editShipping) || 0
-                        const tax = parseFloat(e.target.value) || 0
-                        setEditTotal(String(sub + ship + tax))
-                      }}
-                      className="w-full rounded-lg border border-slate-300 bg-white p-2 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-600"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
-                      Total Quoted Amount (₹)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={editTotal}
-                      onChange={(e) => setEditTotal(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-base font-extrabold text-[#0B56D9] outline-none focus:border-indigo-600"
-                    />
-                  </div>
-                </div>
-              </div>
-              {/* Ownership & remarks (CRM) */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Owner & Remarks
-                </h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                      Assigned owner
+                <div className="mt-2 space-y-1.5 text-sm">
+                  <p>
+                    <span className="font-medium text-slate-500">Name:</span>{" "}
+                    <span className="font-semibold text-slate-800">
+                      {selectedQuote.customer_name || "—"}
                     </span>
-                    <select
-                      value={selectedQuote.assigned_to ?? ""}
-                      onChange={(e) =>
-                        assignQuote(selectedQuote, e.target.value ? Number(e.target.value) : null)
-                      }
-                      disabled={assigning}
-                      className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-600 disabled:opacity-60"
-                    >
-                      <option value="">Unassigned</option>
-                      {users.map((u) => (
-                        <option key={u.adminLoginID} value={u.adminLoginID}>
-                          {u.username}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                      Add remark
+                  </p>
+                  <p>
+                    <span className="font-medium text-slate-500">Phone:</span>{" "}
+                    <span className="font-semibold text-slate-800">
+                      {selectedQuote.customer_phone || "—"}
                     </span>
-                    <QuoteRemarkInput onSave={(text) => addQuoteRemark(selectedQuote, text)} />
-                  </label>
+                  </p>
+                  <p>
+                    <span className="font-medium text-slate-500">Email:</span>{" "}
+                    <span className="font-semibold text-slate-800">
+                      {selectedQuote.customer_email || "—"}
+                    </span>
+                  </p>
                 </div>
+              </div>
 
-                {(selectedQuote.remarks?.length ?? 0) > 0 && (
-                  <div className="mt-3 space-y-2">
-                    {selectedQuote.remarks?.map((remark) => (
-                      <div
-                        key={remark.id}
-                        className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white p-2.5"
-                      >
-                        <div>
-                          <p className="text-sm text-slate-800">{remark.text}</p>
-                          <p className="mt-0.5 text-[11px] text-slate-400">
-                            {remark.author} · {new Date(remark.createdAt).toLocaleString("en-IN")}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => deleteQuoteRemark(selectedQuote, remark.id)}
-                          className="shrink-0 text-xs font-semibold text-rose-500 hover:text-rose-600"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Shipping Destination
+                </h3>
+                <p className="mt-2 text-sm text-slate-800 whitespace-pre-wrap">
+                  {selectedQuote.shipping_address ||
+                    "No shipping address provided."}
+                </p>
               </div>
             </div>
 
-            {/* Modal Footer Actions */}
-            <div className="mt-6 flex flex-col-reverse justify-end gap-3 sm:flex-row border-t border-slate-100 pt-4">
-              <button
-                onClick={() => setSelectedQuote(null)}
-                className="cursor-pointer rounded-lg border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
-              >
-                Close
-              </button>
-              <button
-                onClick={saveQuoteChanges}
-                disabled={isSaving}
-                className="cursor-pointer rounded-lg bg-[#0B56D9] px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-[#0849B7] disabled:opacity-60"
-              >
-                {isSaving ? "Saving changes..." : "Save Quote & Update Status"}
-              </button>
+            {/* Requested Products List */}
+            <div className="mt-6">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Products In This Quote Request
+              </h3>
+              <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+                    <tr>
+                      <th className="p-3">Product</th>
+                      <th className="p-3 text-center">Qty</th>
+                      <th className="p-3 text-right">Quoted Unit Price (₹)</th>
+                      <th className="p-3 text-right">Line Total (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(selectedQuote.order_items || []).map((item) => {
+                      const currentPrice =
+                        parseFloat(itemPrices[item.id] || "0") || 0;
+                      const lineTotal = currentPrice * (item.quantity || 1);
+
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50/50">
+                          <td className="p-3">
+                            <div className="flex items-center gap-3">
+                              {item.image ? (
+                                <img
+                                  src={item.image}
+                                  alt={item.name}
+                                  className="h-10 w-10 rounded-md object-cover border border-slate-200"
+                                />
+                              ) : (
+                                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-400">
+                                  <Package size={16} />
+                                </div>
+                              )}
+                              <div>
+                                <p className="font-semibold text-slate-900">
+                                  {item.name}
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                  ID: {item.product_id || "N/A"}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-3 text-center font-semibold text-slate-800">
+                            {item.quantity}
+                          </td>
+                          <td className="p-3 text-right">
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={itemPrices[item.id] ?? ""}
+                              onChange={(e) => {
+                                const newPrice = e.target.value;
+                                setItemPrices((prev) => ({
+                                  ...prev,
+                                  [item.id]: newPrice,
+                                }));
+                                const newSubtotal = (
+                                  selectedQuote.order_items || []
+                                ).reduce((sum, it) => {
+                                  const p =
+                                    it.id === item.id
+                                      ? parseFloat(newPrice) || 0
+                                      : parseFloat(itemPrices[it.id] || "0") ||
+                                        0;
+                                  return sum + p * (it.quantity || 1);
+                                }, 0);
+                                setEditSubtotal(String(newSubtotal));
+                                const s = parseFloat(editShipping) || 0;
+                                const t = parseFloat(editTax) || 0;
+                                setEditTotal(String(newSubtotal + s + t));
+                              }}
+                              className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-right text-sm font-semibold outline-none focus:border-indigo-600"
+                              placeholder="0"
+                            />
+                          </td>
+                          <td className="p-3 text-right font-mono font-semibold text-slate-900">
+                            ₹{lineTotal.toLocaleString("en-IN")}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Price Breakdown & Status Updating Section */}
+            <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Update Pricing & Quote Status
+              </h3>
+              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">
+                    Subtotal (₹)
+                  </label>
+                  <input
+                    type="number"
+                    value={editSubtotal}
+                    onChange={(e) => {
+                      setEditSubtotal(e.target.value);
+                      const sub = parseFloat(e.target.value) || 0;
+                      const s = parseFloat(editShipping) || 0;
+                      const t = parseFloat(editTax) || 0;
+                      setEditTotal(String(sub + s + t));
+                    }}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-600"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">
+                    Shipping (₹)
+                  </label>
+                  <input
+                    type="number"
+                    value={editShipping}
+                    onChange={(e) => {
+                      setEditShipping(e.target.value);
+                      const sub = parseFloat(editSubtotal) || 0;
+                      const s = parseFloat(e.target.value) || 0;
+                      const t = parseFloat(editTax) || 0;
+                      setEditTotal(String(sub + s + t));
+                    }}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-600"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">
+                    Tax / GST (₹)
+                  </label>
+                  <input
+                    type="number"
+                    value={editTax}
+                    onChange={(e) => {
+                      setEditTax(e.target.value);
+                      const sub = parseFloat(editSubtotal) || 0;
+                      const s = parseFloat(editShipping) || 0;
+                      const t = parseFloat(e.target.value) || 0;
+                      setEditTotal(String(sub + s + t));
+                    }}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 text-sm font-semibold text-slate-800 outline-none focus:border-indigo-600"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">
+                    Total Quoted (₹)
+                  </label>
+                  <input
+                    type="number"
+                    value={editTotal}
+                    onChange={(e) => setEditTotal(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-indigo-300 bg-indigo-50/40 p-2 text-sm font-bold text-indigo-900 outline-none focus:border-indigo-600"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-slate-600">
+                    Quote Status:
+                  </label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value)}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold outline-none focus:border-indigo-600"
+                  >
+                    {STATUSES.map((st) => (
+                      <option key={st} value={st}>
+                        {statusLabels[st] || st}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={saveQuoteChanges}
+                  disabled={isSaving}
+                  className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-indigo-600 px-5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  {isSaving ? "Saving..." : "Save Quote & Prices"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* CRM drawer: owner assignment + remarks + contact */}
+      {/* CRM Actions Drawer (Owner & Remarks) */}
       <LeadActionsDrawer
         open={!!actionQuote}
         onClose={() => setActionQuote(null)}
         code={actionQuote?.order_code}
-        title={actionQuote?.customer_name || "Customer Quote Request"}
+        title={actionQuote?.customer_name ?? "Cart Quote Request"}
         subtitle={
           actionQuote
-            ? `Requested on ${new Date(actionQuote.created_at).toLocaleString("en-IN")}`
+            ? `Requested ${new Date(actionQuote.created_at).toLocaleString("en-IN")}`
             : undefined
         }
         customerName={actionQuote?.customer_name}
         phone={actionQuote?.customer_phone}
         email={actionQuote?.customer_email}
-        whatsappMessage={
-          actionQuote
-            ? `Hello ${actionQuote.customer_name || "Customer"}, regarding your Pick O Pick product quote request (${actionQuote.order_code}). We have reviewed your items and have an update for you.`
-            : undefined
-        }
-        statuses={STATUSES.map((st) => ({ value: st, label: statusLabels[st] || st }))}
+        statuses={STATUSES.map((s) => ({
+          value: s,
+          label: statusLabels[s] || s,
+        }))}
         status={actionQuote?.status ?? "QUOTE_REQUESTED"}
-        onStatusChange={(status) => actionQuote && changeStatusQuick(actionQuote, status)}
+        onStatusChange={(status) =>
+          actionQuote && changeStatusQuick(actionQuote, status)
+        }
         users={users}
         assignedTo={actionQuote?.assigned_to ?? null}
         onAssign={(userId) => actionQuote && assignQuote(actionQuote, userId)}
         assigning={assigning}
         remarks={actionQuote?.remarks ?? []}
         onAddRemark={(text) => actionQuote && addQuoteRemark(actionQuote, text)}
-        onDeleteRemark={(remarkId) => actionQuote && deleteQuoteRemark(actionQuote, remarkId)}
-      />
-    </div>
-  )
-}
-
-function QuoteRemarkInput({ onSave }: { onSave: (text: string) => unknown }) {
-  const [text, setText] = useState("")
-  const [saving, setSaving] = useState(false)
-
-  const save = async () => {
-    const value = text.trim()
-    if (!value) return
-    setSaving(true)
-    await onSave(value)
-    setSaving(false)
-    setText("")
-  }
-
-  return (
-    <div className="flex gap-2">
-      <input
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && save()}
-        placeholder="Follow-up note…"
-        className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm outline-none focus:border-indigo-600"
-      />
-      <button
-        type="button"
-        onClick={save}
-        disabled={saving || !text.trim()}
-        className="shrink-0 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-800 disabled:opacity-50"
+        onDeleteRemark={(remarkId) =>
+          actionQuote && deleteQuoteRemark(actionQuote, remarkId)
+        }
       >
-        {saving ? "…" : "Add"}
-      </button>
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+            <Package size={14} /> Cart items overview
+          </h3>
+          <div className="mt-3 space-y-2">
+            {(actionQuote?.order_items || []).map((it) => (
+              <div
+                key={it.id}
+                className="flex items-center justify-between text-xs"
+              >
+                <span className="font-medium text-slate-800">{it.name}</span>
+                <span className="text-slate-500">
+                  Qty: {it.quantity} · ₹
+                  {(it.price * (it.quantity || 1)).toLocaleString("en-IN")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      </LeadActionsDrawer>
     </div>
-  )
+  );
 }

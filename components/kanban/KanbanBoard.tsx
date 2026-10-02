@@ -16,8 +16,13 @@ import { ClipboardList, GripVertical, MessageSquare, RefreshCw, ShoppingBag, Tru
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import { getSession } from "@/lib/auth"
-import LeadActionsDrawer, { Remark } from "@/components/crm/LeadActionsDrawer"
+import LeadActionsDrawer from "@/components/crm/LeadActionsDrawer"
 import { useAssignableUsers, userNameById } from "@/components/crm/useAssignableUsers"
+import {
+  Remark,
+  assignLeadOwner,
+  resolveAssignedTo,
+} from "@/components/crm/crmHelpers"
 
 type Card = {
   id: string
@@ -27,7 +32,8 @@ type Card = {
   phone: string
   email: string | null
   status: string
-  assigned_to?: number | null
+  assigned_to: string | null
+  remarks: Remark[]
   remarkCount: number
   created_at: string
 }
@@ -37,7 +43,7 @@ type ModuleConfig = {
   label: string
   table: string
   icon: any
-  statuses: { value: string; label: string; dot: string; ring: string }[]
+  statuses: { value: string; label: string; dot: string }[]
   load: () => Promise<Card[]>
 }
 
@@ -48,14 +54,13 @@ const dotClasses: Record<string, string> = {
   indigo: "bg-indigo-500",
   emerald: "bg-emerald-500",
   slate: "bg-slate-400",
-  purple: "bg-purple-500",
 }
 
 const fmtDate = (value: string) =>
   new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
 
-const remarkCount = (value: unknown) =>
-  Array.isArray(value) ? value.length : 0
+const countRemarks = (value: unknown) =>
+  Array.isArray(value) ? value.filter((r: any) => r?.type !== "assignment").length : 0
 
 const MODULES: ModuleConfig[] = [
   {
@@ -64,11 +69,11 @@ const MODULES: ModuleConfig[] = [
     table: "estimate_leads",
     icon: ClipboardList,
     statuses: [
-      { value: "NEW", label: "New", dot: "rose", ring: "ring-rose-200" },
-      { value: "CONTACTED", label: "Contacted", dot: "amber", ring: "ring-amber-200" },
-      { value: "QUOTED", label: "Quoted", dot: "indigo", ring: "ring-indigo-200" },
-      { value: "CONVERTED", label: "Converted", dot: "emerald", ring: "ring-emerald-200" },
-      { value: "CLOSED", label: "Closed", dot: "slate", ring: "ring-slate-200" },
+      { value: "NEW", label: "New", dot: "rose" },
+      { value: "CONTACTED", label: "Contacted", dot: "amber" },
+      { value: "QUOTED", label: "Quoted", dot: "indigo" },
+      { value: "CONVERTED", label: "Converted", dot: "emerald" },
+      { value: "CLOSED", label: "Closed", dot: "slate" },
     ],
     load: async () => {
       const { data, error } = await supabase.from("estimate_leads").select("*").order("created_at", { ascending: false })
@@ -81,8 +86,9 @@ const MODULES: ModuleConfig[] = [
         phone: row.whatsapp_number,
         email: row.email,
         status: row.status,
-        assigned_to: row.assigned_to,
-        remarkCount: remarkCount(row.remarks),
+        assigned_to: resolveAssignedTo(row),
+        remarks: Array.isArray(row.remarks) ? row.remarks : [],
+        remarkCount: countRemarks(row.remarks),
         created_at: row.created_at,
       }))
     },
@@ -93,11 +99,11 @@ const MODULES: ModuleConfig[] = [
     table: "nri_requests",
     icon: Truck,
     statuses: [
-      { value: "PENDING", label: "Pending", dot: "rose", ring: "ring-rose-200" },
-      { value: "CONTACTED", label: "Contacted", dot: "amber", ring: "ring-amber-200" },
-      { value: "CONFIRMED", label: "Confirmed", dot: "blue", ring: "ring-blue-200" },
-      { value: "COMPLETED", label: "Completed", dot: "emerald", ring: "ring-emerald-200" },
-      { value: "CANCELLED", label: "Cancelled", dot: "slate", ring: "ring-slate-200" },
+      { value: "PENDING", label: "Pending", dot: "rose" },
+      { value: "CONTACTED", label: "Contacted", dot: "amber" },
+      { value: "CONFIRMED", label: "Confirmed", dot: "blue" },
+      { value: "COMPLETED", label: "Completed", dot: "emerald" },
+      { value: "CANCELLED", label: "Cancelled", dot: "slate" },
     ],
     load: async () => {
       const { data, error } = await supabase.from("nri_requests").select("*").order("created_at", { ascending: false })
@@ -110,8 +116,9 @@ const MODULES: ModuleConfig[] = [
         phone: row.whatsapp_number,
         email: row.email,
         status: row.status,
-        assigned_to: row.assigned_to,
-        remarkCount: remarkCount(row.remarks),
+        assigned_to: resolveAssignedTo(row),
+        remarks: Array.isArray(row.remarks) ? row.remarks : [],
+        remarkCount: countRemarks(row.remarks),
         created_at: row.created_at,
       }))
     },
@@ -122,11 +129,11 @@ const MODULES: ModuleConfig[] = [
     table: "orders",
     icon: ShoppingBag,
     statuses: [
-      { value: "QUOTE_REQUESTED", label: "Quote Requested", dot: "amber", ring: "ring-amber-200" },
-      { value: "CONTACTED", label: "Contacted", dot: "blue", ring: "ring-blue-200" },
-      { value: "QUOTED", label: "Quoted", dot: "indigo", ring: "ring-indigo-200" },
-      { value: "COMPLETED", label: "Completed", dot: "emerald", ring: "ring-emerald-200" },
-      { value: "CANCELLED", label: "Cancelled", dot: "slate", ring: "ring-slate-200" },
+      { value: "QUOTE_REQUESTED", label: "Quote Requested", dot: "amber" },
+      { value: "CONTACTED", label: "Contacted", dot: "blue" },
+      { value: "QUOTED", label: "Quoted", dot: "indigo" },
+      { value: "COMPLETED", label: "Completed", dot: "emerald" },
+      { value: "CANCELLED", label: "Cancelled", dot: "slate" },
     ],
     load: async () => {
       const { data, error } = await supabase.from("orders").select("*").order("created_at", { ascending: false })
@@ -139,8 +146,9 @@ const MODULES: ModuleConfig[] = [
         phone: row.customer_phone,
         email: row.customer_email,
         status: row.status,
-        assigned_to: row.assigned_to,
-        remarkCount: remarkCount(row.remarks),
+        assigned_to: resolveAssignedTo(row),
+        remarks: Array.isArray(row.remarks) ? row.remarks : [],
+        remarkCount: countRemarks(row.remarks),
         created_at: row.created_at,
       }))
     },
@@ -151,11 +159,11 @@ const MODULES: ModuleConfig[] = [
     table: "service_requests",
     icon: RefreshCw,
     statuses: [
-      { value: "NEW", label: "New", dot: "rose", ring: "ring-rose-200" },
-      { value: "CONTACTED", label: "Contacted", dot: "amber", ring: "ring-amber-200" },
-      { value: "IN_PROGRESS", label: "In Progress", dot: "blue", ring: "ring-blue-200" },
-      { value: "COMPLETED", label: "Completed", dot: "emerald", ring: "ring-emerald-200" },
-      { value: "CLOSED", label: "Closed", dot: "slate", ring: "ring-slate-200" },
+      { value: "NEW", label: "New", dot: "rose" },
+      { value: "CONTACTED", label: "Contacted", dot: "amber" },
+      { value: "IN_PROGRESS", label: "In Progress", dot: "blue" },
+      { value: "COMPLETED", label: "Completed", dot: "emerald" },
+      { value: "CLOSED", label: "Closed", dot: "slate" },
     ],
     load: async () => {
       const { data, error } = await supabase.from("service_requests").select("*").order("created_at", { ascending: false })
@@ -168,8 +176,9 @@ const MODULES: ModuleConfig[] = [
         phone: row.phone,
         email: row.email,
         status: row.status,
-        assigned_to: row.assigned_to,
-        remarkCount: remarkCount(row.remarks),
+        assigned_to: resolveAssignedTo(row),
+        remarks: Array.isArray(row.remarks) ? row.remarks : [],
+        remarkCount: countRemarks(row.remarks),
         created_at: row.created_at,
       }))
     },
@@ -202,9 +211,12 @@ function KanbanCard({ card, ownerName, dragging }: { card: Card; ownerName: stri
           {ownerName ? (
             <span
               title={`Owner: ${ownerName}`}
-              className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[9px] font-bold uppercase text-white"
+              className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-1.5 py-0.5 ring-1 ring-indigo-200"
             >
-              {ownerName[0]}
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[8px] font-bold uppercase text-white">
+                {ownerName[0]}
+              </span>
+              <span className="max-w-[70px] truncate text-[10px] font-semibold text-indigo-700">{ownerName}</span>
             </span>
           ) : (
             <span className="rounded-full border border-dashed border-slate-300 px-1.5 py-0.5 text-[9px] font-semibold text-slate-400">
@@ -246,9 +258,9 @@ function Column({
   owners,
   onOpen,
 }: {
-  status: { value: string; label: string; dot: string; ring: string }
+  status: { value: string; label: string; dot: string }
   cards: Card[]
-  owners: Record<number, string | null>
+  owners: Record<string, string | null>
   onOpen: (card: Card) => void
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: status.value })
@@ -296,15 +308,20 @@ export default function KanbanBoard() {
 
   // Detail popup (opened by clicking a card)
   const [detailCard, setDetailCard] = useState<Card | null>(null)
-  const [detail, setDetail] = useState<{ assigned_to: number | null; status: string; remarks: Remark[] } | null>(null)
+  const [detail, setDetail] = useState<{
+    assigned_to: string | null
+    status: string
+    remarks: Remark[]
+  } | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [assigning, setAssigning] = useState(false)
   const lastDragEndRef = useRef(0)
 
   const module = useMemo(() => MODULES.find((m) => m.key === moduleKey)!, [moduleKey])
 
+  // adminLoginID (string) -> username, for the owner chips on cards
   const owners = useMemo(() => {
-    const map: Record<number, string | null> = {}
+    const map: Record<string, string | null> = {}
     users.forEach((u) => (map[u.adminLoginID] = u.username))
     return map
   }, [users])
@@ -355,6 +372,12 @@ export default function KanbanBoard() {
     }
   }
 
+  // Patch one card everywhere (board + open popup)
+  const patchCard = (id: string, patch: Partial<Card>) => {
+    setCards((items) => items.map((c) => (c.id === id ? { ...c, ...patch } : c)))
+    setDetailCard((curr) => (curr && curr.id === id ? { ...curr, ...patch } : curr))
+  }
+
   // --- Card click -> detail popup ---
 
   const openDetail = async (card: Card) => {
@@ -362,7 +385,11 @@ export default function KanbanBoard() {
     if (Date.now() - lastDragEndRef.current < 250) return
 
     setDetailCard(card)
-    setDetail(null)
+    setDetail({
+      assigned_to: card.assigned_to,
+      status: card.status,
+      remarks: card.remarks,
+    })
     setDetailLoading(true)
     const { data, error } = await supabase
       .from(module.table)
@@ -370,40 +397,62 @@ export default function KanbanBoard() {
       .eq("id", card.id)
       .single()
     setDetailLoading(false)
-    if (error) {
-      toast.error(`Could not load lead: ${error.message}`)
-      setDetailCard(null)
-      return
-    }
+    if (error) return // keep showing card data — the select may lack new columns until SQL runs
     setDetail({
-      assigned_to: (data as any)?.assigned_to ?? null,
+      assigned_to: resolveAssignedTo(data),
       status: (data as any)?.status ?? card.status,
       remarks: Array.isArray((data as any)?.remarks) ? (data as any).remarks : [],
     })
   }
 
-  const patchCard = (id: string, patch: Partial<Card>) => {
-    setCards((items) => items.map((c) => (c.id === id ? { ...c, ...patch } : c)))
-    setDetailCard((curr) => (curr && curr.id === id ? { ...curr, ...patch } : curr))
-  }
+  // --- Assignment (optimistic: the board chip updates instantly) ---
 
-  const assignDetail = async (userId: number | null) => {
-    if (!detailCard) return
-    setAssigning(true)
-    const { error } = await supabase.from(module.table).update({ assigned_to: userId }).eq("id", detailCard.id)
-    setAssigning(false)
-    if (error) return toast.error(`Could not assign owner: ${error.message}`)
-    setDetail((curr) => (curr ? { ...curr, assigned_to: userId } : curr))
+  const assignDetail = async (userId: string | null) => {
+    if (!detailCard || !detail) return
+    const prevOwner = detail.assigned_to
+    const prevCardOwner = detailCard.assigned_to
+
+    // 1. Instant local update — chip changes on the card immediately
+    setDetail({ ...detail, assigned_to: userId })
     patchCard(detailCard.id, { assigned_to: userId })
-    toast.success(userId ? `Assigned to ${userNameById(users, userId) ?? "user"}` : "Owner cleared")
+
+    setAssigning(true)
+    const targetUser = users.find((u) => String(u.adminLoginID) === String(userId))
+    const res = await assignLeadOwner({
+      table: module.table,
+      id: detailCard.id,
+      userId,
+      userName: targetUser?.username,
+      currentRemarks: detail.remarks,
+    })
+    setAssigning(false)
+
+    if (!res.success) {
+      // Roll back
+      setDetail((curr) => (curr ? { ...curr, assigned_to: prevOwner } : curr))
+      patchCard(detailCard.id, { assigned_to: prevCardOwner })
+      return toast.error(`Could not assign owner: ${res.error?.message || "Database error"}`)
+    }
+
+    if (res.remarks) {
+      setDetail((curr) => (curr ? { ...curr, remarks: res.remarks } : curr))
+      patchCard(detailCard.id, { remarks: res.remarks, remarkCount: countRemarks(res.remarks) })
+    }
+    toast.success(userId ? `Assigned to ${targetUser?.username ?? userId}` : "Owner cleared")
   }
 
   const changeDetailStatus = async (status: string) => {
     if (!detailCard) return
-    const { error } = await supabase.from(module.table).update({ status }).eq("id", detailCard.id)
-    if (error) return toast.error(`Could not update status: ${error.message}`)
+    const prevStatus = detailCard.status
     setDetail((curr) => (curr ? { ...curr, status } : curr))
     patchCard(detailCard.id, { status })
+
+    const { error } = await supabase.from(module.table).update({ status }).eq("id", detailCard.id)
+    if (error) {
+      setDetail((curr) => (curr ? { ...curr, status: prevStatus } : curr))
+      patchCard(detailCard.id, { status: prevStatus })
+      return toast.error(`Could not update status: ${error.message}`)
+    }
     const label = module.statuses.find((s) => s.value === status)?.label ?? status
     toast.success(`${detailCard.code} moved to ${label}`)
   }
@@ -418,20 +467,30 @@ export default function KanbanBoard() {
       createdAt: new Date().toISOString(),
     }
     const next = [...detail.remarks, remark]
-    const { error } = await supabase.from(module.table).update({ remarks: next }).eq("id", detailCard.id)
-    if (error) return toast.error(`Could not add remark: ${error.message}`)
     setDetail({ ...detail, remarks: next })
-    patchCard(detailCard.id, { remarkCount: next.length })
+    patchCard(detailCard.id, { remarks: next, remarkCount: countRemarks(next) })
+
+    const { error } = await supabase.from(module.table).update({ remarks: next }).eq("id", detailCard.id)
+    if (error) {
+      setDetail({ ...detail, remarks: detail.remarks })
+      patchCard(detailCard.id, { remarks: detailCard.remarks, remarkCount: detailCard.remarkCount })
+      return toast.error(`Could not add remark: ${error.message}`)
+    }
     toast.success("Remark added")
   }
 
   const deleteDetailRemark = async (remarkId: string) => {
     if (!detailCard || !detail) return
     const next = detail.remarks.filter((r) => r.id !== remarkId)
-    const { error } = await supabase.from(module.table).update({ remarks: next }).eq("id", detailCard.id)
-    if (error) return toast.error(`Could not delete remark: ${error.message}`)
     setDetail({ ...detail, remarks: next })
-    patchCard(detailCard.id, { remarkCount: next.length })
+    patchCard(detailCard.id, { remarks: next, remarkCount: countRemarks(next) })
+
+    const { error } = await supabase.from(module.table).update({ remarks: next }).eq("id", detailCard.id)
+    if (error) {
+      setDetail({ ...detail, remarks: detail.remarks })
+      patchCard(detailCard.id, { remarks: detailCard.remarks, remarkCount: detailCard.remarkCount })
+      return toast.error(`Could not delete remark: ${error.message}`)
+    }
     toast.success("Remark deleted")
   }
 
@@ -515,7 +574,7 @@ export default function KanbanBoard() {
         title={detailCard?.name ?? "Lead"}
         subtitle={
           detailLoading
-            ? "Loading lead details…"
+            ? "Refreshing lead details…"
             : detailCard
               ? `${module.label} · received ${new Date(detailCard.created_at).toLocaleString("en-IN")}`
               : undefined

@@ -1,37 +1,37 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Topbar from "./Topbar"
-import Sidenav from "./Sidenav"
-import Footer from "./Footer"
+import { useState } from "react";
+import Topbar from "./Topbar";
+import Sidenav from "./Sidenav";
+import Footer from "./Footer";
 
 export default function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  const [collapsed, setCollapsed] = useState(false)
-  //console.log("DashboardLayout render, collapsed =", collapsed)
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen flex bg-muted/40">
+    <div className="min-h-screen flex bg-slate-50">
       {/* Sidebar */}
-      <Sidenav collapsed={collapsed} />
+      <Sidenav
+        collapsed={collapsed}
+        onToggle={() => setCollapsed((prev) => !prev)}
+      />
 
       {/* Main */}
-      <div className="flex-1 flex flex-col">
-         <Topbar
+      <div className="flex-1 flex flex-col min-w-0">
+        <Topbar
           onToggle={() => {
-            setCollapsed((prev) => !prev)
+            setCollapsed((prev) => !prev);
           }}
         />
 
-        <main className="flex-1 p-6">
-          {children}
-        </main>
+        <main className="flex-1 p-6">{children}</main>
 
         <Footer />
       </div>
     </div>
-  )
+  );
 }
