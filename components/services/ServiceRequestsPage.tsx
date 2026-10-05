@@ -887,31 +887,25 @@ export default function ServiceRequestsPage() {
 
               {/* Service Details Card based on type */}
               {selectedReq.service_type === "order_and_send" && (
-                <DetailBlock title="Order & Send Logistics">
-                  <FieldItem
-                    label="Pickup City (India)"
-                    value={selectedReq.payload?.pickupLocation || "India pickup"}
-                  />
-                  <FieldItem
-                    label="Drop Destination"
-                    value={selectedReq.payload?.dropLocation || selectedReq.location}
-                  />
+                <DetailBlock title="Order & Send Details">
                   <div className="sm:col-span-2">
                     <FieldItem
-                      label="Items / Products to Ship"
-                      value={selectedReq.payload?.itemsToShip}
+                      label="Product URL or Item Description"
+                      value={selectedReq.payload?.productUrl}
                     />
                   </div>
-                  {selectedReq.payload?.productLinks && (
-                    <div className="sm:col-span-2 mt-2">
-                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
-                        Shared Product Links (Myntra, Meesho, Amazon, Flipkart, etc.)
-                      </span>
-                      <p className="mt-1 p-3 bg-slate-50 rounded-xl text-xs font-mono text-slate-800 break-all border border-slate-200">
-                        {String(selectedReq.payload.productLinks)}
-                      </p>
-                    </div>
-                  )}
+                  <FieldItem
+                    label="Store Name / Source"
+                    value={selectedReq.payload?.sourceStore}
+                  />
+                  <FieldItem
+                    label="Size / Variant / Quantity / Notes"
+                    value={selectedReq.payload?.itemNotes}
+                  />
+                  <FieldItem
+                    label="Destination Country"
+                    value={selectedReq.payload?.destinationCountry}
+                  />
                 </DetailBlock>
               )}
 
@@ -919,28 +913,22 @@ export default function ServiceRequestsPage() {
                 <DetailBlock title="Buy & Ship Requirements">
                   <div className="sm:col-span-2">
                     <FieldItem
-                      label="What to Buy (Items & Specifications)"
-                      value={selectedReq.payload?.whatToBuy}
+                      label="What to Buy (Product Details)"
+                      value={selectedReq.payload?.productDetails}
                     />
                   </div>
                   <FieldItem
-                    label="Where to Buy (Stores / Platforms)"
-                    value={selectedReq.payload?.whereToBuy}
+                    label="Store Shortlisted (optional)"
+                    value={selectedReq.payload?.sourceStore}
                   />
                   <FieldItem
-                    label="Where to Send"
-                    value={selectedReq.payload?.whereToSend || selectedReq.location}
+                    label="Size / Variant / Quantity / Notes"
+                    value={selectedReq.payload?.itemNotes}
                   />
-                  {selectedReq.payload?.productLinks && (
-                    <div className="sm:col-span-2 mt-2">
-                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
-                        Product Links
-                      </span>
-                      <p className="mt-1 p-3 bg-slate-50 rounded-xl text-xs font-mono text-slate-800 break-all border border-slate-200">
-                        {String(selectedReq.payload.productLinks)}
-                      </p>
-                    </div>
-                  )}
+                  <FieldItem
+                    label="Destination Country"
+                    value={selectedReq.payload?.destinationCountry}
+                  />
                 </DetailBlock>
               )}
 
