@@ -55,7 +55,7 @@ export default function ProductDrawer({
     categoryID: "",
     status: "Published",
   })
-  const [categories, setCategories] = useState<{ categoryID: number; categoryName: string }[]>([])
+  const [categories, setCategories] = useState<{ categoryID: string | number; categoryName: string }[]>([])
   const [existing, setExisting] = useState<string[]>([])
   const [files, setFiles] = useState<File[]>([])
   const [filePreviews, setFilePreviews] = useState<string[]>([])
@@ -150,7 +150,9 @@ export default function ProductDrawer({
         stock: Number(form.stock || 0),
         price: Number(form.price || 0),
         description: form.description,
-        categoryID: Number(form.categoryID),
+        // Category IDs are UUIDs in Supabase. Converting them with Number()
+        // produces NaN, which the API serializes as null.
+        categoryID: form.categoryID,
         status: form.status,
         imageURL: [...existing, ...uploaded],
       }
