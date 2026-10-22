@@ -13,6 +13,7 @@ import CustomerDrawer from "./CustomerDrawer"
 import CustomerForm from "./CustomerForm"
 import PageHeader from "@/components/common/PageHeader"
 import bcrypt from "bcryptjs"
+import { filterCustomers } from "@/lib/customerSearch"
 
 export type Address = {
   addressID?: number
@@ -49,16 +50,7 @@ export default function CustomerPage() {
     fetchCustomers()
   }, [])
 
-  const filteredCustomers = customers.filter((c) => {
-    const text = search.toLowerCase()
-
-    return (
-        c.firstName.toLowerCase().includes(text) ||
-        c.lastName.toLowerCase().includes(text) ||
-        c.phoneNumber.includes(text) ||
-        c.emailID?.toLowerCase().includes(text)
-    )
-    })
+  const filteredCustomers = filterCustomers(customers, search)
 
   const fetchCustomers = async () => {
     const { data, error } = await supabase
@@ -79,7 +71,7 @@ export default function CustomerPage() {
     if (error) return console.error(error)
 
     setCustomers(
-      data.map((c: any) => ({
+      (data ?? []).map((c: any) => ({
         ...c,
         addresses: c.addressTable || [],
       }))

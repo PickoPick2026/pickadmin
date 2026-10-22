@@ -100,7 +100,7 @@ export async function assignLeadOwner({
 
 /**
  * Builds a direct WhatsApp web/app link.
- * Handles country codes (+91 default for 10-digit Indian numbers).
+ * Uses only the country code already present in the submitted number.
  */
 export function buildWhatsAppLink(
   phone?: string | null,
@@ -108,14 +108,9 @@ export function buildWhatsAppLink(
 ): string | null {
   const clean = (phone || "").replace(/\D/g, "");
   if (!clean) return null;
-  const full = clean.startsWith("91")
-    ? clean
-    : clean.length === 10
-      ? "91" + clean
-      : clean;
   return (
     "https://api.whatsapp.com/send?phone=" +
-    full +
+    clean +
     "&text=" +
     encodeURIComponent(message)
   );

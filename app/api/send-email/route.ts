@@ -25,6 +25,12 @@ export async function POST(req: Request) {
           },
         },
       ],
+      cc: [{
+        email_address: {
+          address: "sales@pickopick.com",
+          name: "Pick O Pick Sales",
+        },
+      }],
       merge_info: {
         name,
         pickID,
